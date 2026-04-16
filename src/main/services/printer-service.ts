@@ -1,5 +1,4 @@
 import { BrowserWindow } from 'electron';
-import printer from '@alexssmusica/node-printer';
 
 export type PrinterInfo = {
   name: string;
@@ -12,8 +11,19 @@ const ESC = 0x1b;
 // ESC p m t1 t2
 const CASH_DRAWER_PULSE = Buffer.from([ESC, 0x70, 0x00, 0x19, 0xfa]);
 
+const WINDOWS_ONLY_HARDWARE_MESSAGE =
+  'Esta funcionalidad requiere hardware (impresora, lector QR, cajón de dinero) que solo está disponible en Windows. En macOS no podrás usar estas funciones. El resto de la aplicación funciona con normalidad.';
+
 class PrinterService {
+  private ensureHardwareSupported() {
+    if (process.platform !== 'win32') {
+      throw new Error(WINDOWS_ONLY_HARDWARE_MESSAGE);
+    }
+  }
+
   async listPrinters(): Promise<PrinterInfo[]> {
+    this.ensureHardwareSupported();
+
     const win = BrowserWindow.getAllWindows()[0];
 
     if (!win) {
@@ -30,7 +40,11 @@ class PrinterService {
   }
 
   async openDrawer(printerName?: string) {
+    this.ensureHardwareSupported();
+
     const printers = await this.listPrinters();
+    const printerModule = await import('@alexssmusica/node-printer');
+    const printer = printerModule.default;
 
     const selected =
       printerName?.trim()

@@ -16,6 +16,7 @@ import type {
 declare global {
   interface Window {
     desktopApi: {
+      getPlatform: () => NodeJS.Platform;
       verifyPassword: (password: string) => Promise<ApiResponse<{ valid: boolean }>>;
       getOrderProtectionPassword: () => Promise<unknown>;
       updateOrderProtectionPassword: (input: {

@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '@renderer/services/api';
+import { useHardwareAvailability } from '@renderer/hooks/useHardwareAvailability';
 import {
   Button,
   DataTable,
@@ -78,6 +79,7 @@ Puedes pasar por ella cuando desees.`;
 };
 
 export const OrderDetailPage = () => {
+  const { isHardwareSupported, message: hardwareMessage } = useHardwareAvailability();
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
     queryFn: api.listClients
@@ -139,7 +141,7 @@ export const OrderDetailPage = () => {
 
       const isCash = methodCode === 'cash' || methodName === 'efectivo';
 
-      if (isCash) {
+      if (isCash && isHardwareSupported) {
         try {
           await api.openCashDrawer();
         } catch (error) {
@@ -597,6 +599,10 @@ export const OrderDetailPage = () => {
           </button>
         ))}
       </div>
+
+      {!isHardwareSupported ? (
+        <div className="alert-warning">{hardwareMessage}</div>
+      ) : null}
 
       <div className="card-panel">{tabContent}</div>
 

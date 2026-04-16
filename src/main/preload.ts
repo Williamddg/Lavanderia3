@@ -11,6 +11,7 @@ import type {
 } from '../shared/types.js';
 
 contextBridge.exposeInMainWorld('desktopApi', {
+  getPlatform: () => process.platform,
   verifyPassword: (password: string) =>
     ipcRenderer.invoke('auth:verify-password', password),
 

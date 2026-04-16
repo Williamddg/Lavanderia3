@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@renderer/services/api';
+import { useHardwareAvailability } from '@renderer/hooks/useHardwareAvailability';
 import type { CashCloseResult } from '@shared/types';
 import {
   Button,
@@ -359,6 +360,7 @@ const buildThermalCloseHtml = (data: CashCloseResult) => {
 
 export const CashPage = () => {
   const queryClient = useQueryClient();
+  const { isHardwareSupported, message: hardwareMessage } = useHardwareAvailability();
 
   const { data } = useQuery({
     queryKey: ['cash-summary'],
@@ -367,7 +369,8 @@ export const CashPage = () => {
 
   const { data: printers = [] } = useQuery({
     queryKey: ['printers'],
-    queryFn: api.listPrinters
+    queryFn: api.listPrinters,
+    enabled: isHardwareSupported
   });
 
   const [openingAmount, setOpeningAmount] = useState(0);
@@ -445,6 +448,7 @@ export const CashPage = () => {
 
   const handlePrintThermalClose = () => {
     if (!closurePreview) return;
+    if (!isHardwareSupported) return;
 
     const html = buildThermalCloseHtml(closurePreview);
     const printWindow = window.open('', '_blank', 'width=430,height=900');
@@ -706,49 +710,55 @@ export const CashPage = () => {
           <div className="card-panel stack-gap">
             <h3>Abrir cajón</h3>
 
-            <label>
-              <span>Impresora</span>
-              <select
-                className="field"
-                value={selectedPrinter}
-                onChange={(e) => setSelectedPrinter(e.target.value)}
-              >
-                <option value="">Usar impresora predeterminada</option>
-                {printers.map((printer) => (
-                  <option key={printer.name} value={printer.name}>
-                    {printer.name}
-                    {printer.isDefault ? ' (Predeterminada)' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {!isHardwareSupported ? (
+              <div className="alert-warning">{hardwareMessage}</div>
+            ) : (
+              <>
+                <label>
+                  <span>Impresora</span>
+                  <select
+                    className="field"
+                    value={selectedPrinter}
+                    onChange={(e) => setSelectedPrinter(e.target.value)}
+                  >
+                    <option value="">Usar impresora predeterminada</option>
+                    {printers.map((printer) => (
+                      <option key={printer.name} value={printer.name}>
+                        {printer.name}
+                        {printer.isDefault ? ' (Predeterminada)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <div className="form-actions">
-              <Button
-                onClick={() =>
-                  openDrawerMutation.mutate(selectedPrinter || undefined)
-                }
-                disabled={openDrawerMutation.isPending}
-              >
-                {openDrawerMutation.isPending ? 'Abriendo...' : 'Abrir cajón'}
-              </Button>
-            </div>
+                <div className="form-actions">
+                  <Button
+                    onClick={() =>
+                      openDrawerMutation.mutate(selectedPrinter || undefined)
+                    }
+                    disabled={openDrawerMutation.isPending}
+                  >
+                    {openDrawerMutation.isPending ? 'Abriendo...' : 'Abrir cajón'}
+                  </Button>
+                </div>
 
-            {openDrawerMutation.data && (
-              <div className="card-panel" style={{ background: '#f8fafc' }}>
-                <p style={{ margin: 0 }}>
-                  <strong>Resultado:</strong> {openDrawerMutation.data.message}
-                </p>
-                <p style={{ margin: '6px 0 0' }}>
-                  <strong>Impresora:</strong> {openDrawerMutation.data.printerName}
-                </p>
-              </div>
-            )}
+                {openDrawerMutation.data && (
+                  <div className="card-panel" style={{ background: '#f8fafc' }}>
+                    <p style={{ margin: 0 }}>
+                      <strong>Resultado:</strong> {openDrawerMutation.data.message}
+                    </p>
+                    <p style={{ margin: '6px 0 0' }}>
+                      <strong>Impresora:</strong> {openDrawerMutation.data.printerName}
+                    </p>
+                  </div>
+                )}
 
-            {openDrawerMutation.isError && (
-              <p className="error-text">
-                {(openDrawerMutation.error as Error).message}
-              </p>
+                {openDrawerMutation.isError && (
+                  <p className="error-text">
+                    {(openDrawerMutation.error as Error).message}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -804,9 +814,15 @@ export const CashPage = () => {
           </p>
 
           <div className="form-actions" style={{ marginTop: 12 }}>
-            <Button variant="secondary" onClick={handlePrintThermalClose}>
-              Imprimir cierre térmico
-            </Button>
+            {!isHardwareSupported ? (
+              <div className="alert-warning" style={{ width: '100%' }}>
+                {hardwareMessage}
+              </div>
+            ) : (
+              <Button variant="secondary" onClick={handlePrintThermalClose}>
+                Imprimir cierre térmico
+              </Button>
+            )}
           </div>
         </div>
       )}
