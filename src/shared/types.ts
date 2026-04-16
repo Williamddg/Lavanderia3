@@ -14,6 +14,61 @@ export type HealthStatus = {
   message: string;
 };
 
+export type SetupRootConnectionInput = {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  databaseName: string;
+  ssl?: boolean;
+};
+
+export type SetupCreateDatabaseResult = {
+  success: boolean;
+  databaseName: string;
+  message: string;
+};
+
+export type SetupInitializeSchemaResult = {
+  success: boolean;
+  databaseName: string;
+  executedFiles: string[];
+  message: string;
+};
+
+export type SetupInitializeProgress = {
+  current: number;
+  total: number;
+  percent: number;
+  file: string;
+  status: 'running' | 'completed';
+  message: string;
+};
+
+export type SetupAppUserInput = {
+  username: string;
+  password: string;
+};
+
+export type SetupApplicationUserInput = {
+  username: string;
+  password: string;
+  fullName: string;
+};
+
+export type SetupFinalizeInput = {
+  root: SetupRootConnectionInput;
+  appUser: SetupAppUserInput;
+  adminUser: SetupApplicationUserInput;
+  sellerUser: SetupApplicationUserInput;
+};
+
+export type SetupFinalizeResult = {
+  success: boolean;
+  message: string;
+  connection: DbConnectionConfig;
+};
+
 export type ApiResponse<T> = {
   success: boolean;
   data?: T;
@@ -468,4 +523,3 @@ export type CreateOrderInput = {
   initialPaymentMethodId?: number | null;
   initialPaymentReference?: string | null;
 };
-

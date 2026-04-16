@@ -29,7 +29,8 @@ textarea {
 .app-shell {
   display: grid;
   grid-template-columns: 280px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -39,6 +40,8 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .brand-panel {
@@ -47,18 +50,26 @@ textarea {
   border-radius: 18px;
   display: grid;
   gap: 4px;
+  flex: 0 0 auto;
 }
 
 .sidebar-nav {
   display: grid;
   gap: 8px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .nav-link {
   color: #dce8f3;
+  min-height: 48px;
   padding: 12px 14px;
   border-radius: 12px;
+  display: flex;
+  align-items: center;
+  flex: 0 0 48px;
 }
 
 .nav-link.active,
@@ -71,11 +82,15 @@ textarea {
   gap: 8px;
   padding-top: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex: 0 0 auto;
 }
 
 .content-shell {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .topbar {
@@ -107,10 +122,25 @@ textarea {
   padding: 12px 16px;
   box-shadow: 0 6px 24px rgba(31, 44, 56, 0.08);
   display: grid;
+  min-width: 180px;
+  justify-items: end;
+  line-height: 1.2;
+}
+
+.topbar-clock {
+  font-variant-numeric: tabular-nums;
+  color: #4f6ef7;
+  font-weight: 700;
+}
+
+.topbar-user small {
+  color: #627182;
 }
 
 .page-content {
   padding: 24px 32px 32px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .stack-gap {

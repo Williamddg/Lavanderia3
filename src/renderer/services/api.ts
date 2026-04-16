@@ -9,10 +9,8 @@ import type {
   ClientInput,
   CompanySettings,
   DashboardSummary,
-  DbConnectionConfig,
   DeliveryInput,
   DeliveryRecord,
-  HealthStatus,
   Invoice,
   InvoiceDetail,
   LoginInput,
@@ -35,6 +33,12 @@ import type {
   BackupUploadResult,
   ConnectDriveResult,
   CashOpenInput,
+  SetupCreateDatabaseResult,
+  SetupFinalizeInput,
+  SetupFinalizeResult,
+  SetupInitializeProgress,
+  SetupInitializeSchemaResult,
+  SetupRootConnectionInput,
 } from '@shared/types';
 
 async function unwrap<T>(promise: Promise<unknown>): Promise<T> {
@@ -93,8 +97,16 @@ export const api = {
   listExpenses: () => unwrap<Expense[]>(window.desktopApi.listExpenses()),
   createExpense: (input: ExpenseInput) => unwrap<Expense>(window.desktopApi.createExpense(input)),
   health: () => unwrap<HealthStatus>(window.desktopApi.health()),
+  restartApp: () => unwrap<{ restarted: boolean }>(window.desktopApi.restartApp()),
   openExternal: (url: string) => unwrap(window.desktopApi.openExternal({ url })),
-  saveDbConfig: (config: DbConnectionConfig) => unwrap<HealthStatus>(window.desktopApi.saveDbConfig(config)),
+  setupCreateDatabase: (input: SetupRootConnectionInput) =>
+    unwrap<SetupCreateDatabaseResult>(window.desktopApi.setupCreateDatabase(input)),
+  setupInitializeSchema: (input: SetupRootConnectionInput) =>
+    unwrap<SetupInitializeSchemaResult>(window.desktopApi.setupInitializeSchema(input)),
+  onSetupInitializeProgress: (callback: (progress: SetupInitializeProgress) => void) =>
+    window.desktopApi.onSetupInitializeProgress(callback),
+  setupFinalize: (input: SetupFinalizeInput) =>
+    unwrap<SetupFinalizeResult>(window.desktopApi.setupFinalize(input)),
   login: (input: LoginInput) => unwrap<SessionUser>(window.desktopApi.login(input)),
   companySettings: () => unwrap<CompanySettings | null>(window.desktopApi.getCompanySettings()),
 

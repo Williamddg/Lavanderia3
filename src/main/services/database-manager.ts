@@ -62,10 +62,25 @@ class DatabaseManager {
       });
       await connection.ping();
       await connection.end();
+    } catch (error) {
+      return {
+        configured: true,
+        connected: false,
+        migrated: false,
+        message: error instanceof Error ? error.message : 'No fue posible conectar.'
+      };
+    }
+
+    try {
       await this.migrate();
       return { configured: true, connected: true, migrated: true, message: 'Conexión y migraciones listas.' };
     } catch (error) {
-      return { configured: true, connected: false, migrated: false, message: error instanceof Error ? error.message : 'No fue posible conectar.' };
+      return {
+        configured: true,
+        connected: false,
+        migrated: false,
+        message: 'La conexión MySQL existe, pero no se pudo preparar el esquema de la aplicación.'
+      };
     }
   }
 }

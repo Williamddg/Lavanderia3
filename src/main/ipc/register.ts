@@ -15,15 +15,17 @@ import { createReportsService } from '../../backend/modules/reports/service.js';
 import { printerService } from '../services/printer-service.js';
 import { backupService } from '../services/backup-service.js';
 import { licenseService } from '../services/license-service.js';
+import { initialSetupService } from '../services/initial-setup-service.js';
 
 import type {
   ClientInput,
-  DbConnectionConfig,
   DeliveryInput,
   ExternalLinkPayload,
   LoginInput,
   OrderInput,
-  PaymentInput
+  PaymentInput,
+  SetupFinalizeInput,
+  SetupRootConnectionInput
 } from '../../shared/types.js';
 
 const wrap =
@@ -159,6 +161,15 @@ export const registerIpc = () => {
   ipcMain.handle('app:health', wrap(async () => databaseManager.healthCheck()));
 
   ipcMain.handle(
+    'app:restart',
+    wrap(async () => {
+      app.relaunch();
+      app.exit(0);
+      return { restarted: true };
+    })
+  );
+
+  ipcMain.handle(
     'app:open-external',
     wrap(async ({ url }: ExternalLinkPayload) => {
       await shell.openExternal(url);
@@ -167,12 +178,35 @@ export const registerIpc = () => {
   );
 
   ipcMain.handle(
-    'db:save-config',
-    wrap(async (config: DbConnectionConfig) => {
-      await databaseManager.saveConfig(config);
-      await databaseManager.migrate();
-      return databaseManager.healthCheck();
-    })
+    'setup:create-database',
+    wrap(async (input: SetupRootConnectionInput) =>
+      initialSetupService.createDatabase(input)
+    )
+  );
+
+  ipcMain.handle(
+    'setup:initialize-schema',
+    async (event, input: SetupRootConnectionInput) => {
+      try {
+        const data = await initialSetupService.initializeSchema(input, (progress) => {
+          event.sender.send('setup:initialize-progress', progress);
+        });
+
+        return { success: true, data };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Error inesperado.'
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'setup:finalize',
+    wrap(async (input: SetupFinalizeInput) =>
+      initialSetupService.finalizeSetup(input)
+    )
   );
 
   ipcMain.handle(

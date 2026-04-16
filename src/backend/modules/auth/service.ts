@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { sql, type Kysely } from 'kysely';
+import bcrypt from 'bcryptjs';
 import type { Database } from '../../db/schema.js';
 import type { LoginInput, SessionUser } from '../../../shared/types.js';
 
@@ -30,8 +31,25 @@ export const createAuthService = (db: Kysely<Database>) => ({
       .where('u.is_active', '=', 1)
       .executeTakeFirst();
 
-    if (!user || user.password_hash !== parsed.password) {
+    const isBcryptHash = Boolean(user?.password_hash?.startsWith('$2'));
+    const passwordMatches = user
+      ? isBcryptHash
+        ? await bcrypt.compare(parsed.password, user.password_hash)
+        : user.password_hash === parsed.password
+      : false;
+
+    if (!user || !passwordMatches) {
       throw new Error('Credenciales inválidas.');
+    }
+
+    if (user && !isBcryptHash) {
+      await db
+        .updateTable('users')
+        .set({
+          password_hash: await bcrypt.hash(parsed.password, 10)
+        })
+        .where('id', '=', user.id)
+        .execute();
     }
 
     await db

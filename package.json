@@ -33,6 +33,13 @@
     ],
     "extraResources": [
       {
+        "from": "src/backend/db/migrations",
+        "to": "sql/migrations",
+        "filter": [
+          "**/*.sql"
+        ]
+      },
+      {
         "from": "resources/bin",
         "to": "bin"
       },
@@ -74,6 +81,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
     "@tanstack/react-query": "^5.76.1",
+    "bcryptjs": "^2.4.3",
     "dayjs": "^1.11.13",
     "electron-store": "^10.1.0",
     "electron-updater": "^6.8.3",

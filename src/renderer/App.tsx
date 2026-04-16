@@ -36,6 +36,12 @@ export default function App() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const refreshHealth = async () => {
+    const nextHealth = await api.health();
+    setHealth(nextHealth);
+    setUser(null);
+  };
+
   useEffect(() => {
     api.health().then(setHealth).finally(() => setLoading(false));
 
@@ -78,7 +84,12 @@ export default function App() {
   }
 
   if (!health?.configured || !health.connected) {
-    return <SetupPage />;
+    return (
+      <SetupPage
+        healthMessage={health?.message ?? null}
+        onCompleted={refreshHealth}
+      />
+    );
   }
 
   if (!user) {

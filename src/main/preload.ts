@@ -1,13 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ClientInput,
-  DbConnectionConfig,
   DeliveryInput,
   ExternalLinkPayload,
   LoginInput,
   OrderInput,
   PaymentInput,
-  ServiceInput
+  ServiceInput,
+  SetupFinalizeInput,
+  SetupInitializeProgress,
+  SetupRootConnectionInput
 } from '../shared/types.js';
 
 contextBridge.exposeInMainWorld('desktopApi', {
@@ -48,8 +50,19 @@ contextBridge.exposeInMainWorld('desktopApi', {
     ipcRenderer.invoke('warranties:update-status', id, input),
 
   health: () => ipcRenderer.invoke('app:health'),
+  restartApp: () => ipcRenderer.invoke('app:restart'),
   openExternal: (payload: ExternalLinkPayload) => ipcRenderer.invoke('app:open-external', payload),
-  saveDbConfig: (config: DbConnectionConfig) => ipcRenderer.invoke('db:save-config', config),
+  setupCreateDatabase: (input: SetupRootConnectionInput) =>
+    ipcRenderer.invoke('setup:create-database', input),
+  setupInitializeSchema: (input: SetupRootConnectionInput) =>
+    ipcRenderer.invoke('setup:initialize-schema', input),
+  onSetupInitializeProgress: (callback: (progress: SetupInitializeProgress) => void) => {
+    const listener = (_event: unknown, progress: SetupInitializeProgress) => callback(progress);
+    ipcRenderer.on('setup:initialize-progress', listener);
+    return () => ipcRenderer.removeListener('setup:initialize-progress', listener);
+  },
+  setupFinalize: (input: SetupFinalizeInput) =>
+    ipcRenderer.invoke('setup:finalize', input),
   login: (input: LoginInput) => ipcRenderer.invoke('auth:login', input),
   getCompanySettings: () => ipcRenderer.invoke('settings:company'),
 

@@ -3,14 +3,16 @@
 import type {
   ApiResponse,
   ClientInput,
-  DbConnectionConfig,
   DeliveryInput,
   ExternalLinkPayload,
   LoginInput,
   OrderInput,
   PaymentInput,
   Service,
-  ServiceInput
+  ServiceInput,
+  SetupFinalizeInput,
+  SetupInitializeProgress,
+  SetupRootConnectionInput
 } from '@shared/types';
 
 declare global {
@@ -65,8 +67,14 @@ declare global {
       deleteService: (id: number) => Promise<{ success: boolean }>;
 
       health: () => Promise<unknown>;
+      restartApp: () => Promise<unknown>;
       openExternal: (payload: ExternalLinkPayload) => Promise<unknown>;
-      saveDbConfig: (config: DbConnectionConfig) => Promise<unknown>;
+      setupCreateDatabase: (input: SetupRootConnectionInput) => Promise<unknown>;
+      setupInitializeSchema: (input: SetupRootConnectionInput) => Promise<unknown>;
+      onSetupInitializeProgress: (
+        callback: (progress: SetupInitializeProgress) => void
+      ) => () => void;
+      setupFinalize: (input: SetupFinalizeInput) => Promise<unknown>;
       login: (input: LoginInput) => Promise<unknown>;
       getCompanySettings: () => Promise<unknown>;
 
