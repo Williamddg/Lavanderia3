@@ -99,6 +99,7 @@ export const api = {
   createExpense: (input: ExpenseInput) => unwrap<Expense>(window.desktopApi.createExpense(input)),
   health: () => unwrap<HealthStatus>(window.desktopApi.health()),
   restartApp: () => unwrap<{ restarted: boolean }>(window.desktopApi.restartApp()),
+  quitApp: () => unwrap<{ quit: boolean }>(window.desktopApi.quitApp()),
   openExternal: (url: string) => unwrap(window.desktopApi.openExternal({ url })),
   setupCreateDatabase: (input: SetupRootConnectionInput) =>
     unwrap<SetupCreateDatabaseResult>(window.desktopApi.setupCreateDatabase(input)),

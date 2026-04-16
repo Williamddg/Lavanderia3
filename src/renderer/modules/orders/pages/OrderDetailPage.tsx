@@ -15,7 +15,51 @@ import { currency, dateTime } from '@renderer/utils/format';
 import { PaymentForm } from '@renderer/modules/payments/components/PaymentForm';
 import { OrderForm } from '../components/OrderForm';
 
+import type { OrderStatus } from '@shared/types';
+
 const buildOrderDraftStorageKey = (orderId: number) => `lavasuite:order-edit-draft:${orderId}`;
+
+const STATUS_ORDER: Record<string, number> = {
+  CREATED: 10,
+  RECEIVED: 10,
+  IN_PROGRESS: 20,
+  READY: 30,
+  READY_FOR_DELIVERY: 40,
+  DELIVERED: 50,
+  WARRANTY: -1
+};
+const TERMINAL_CODES = new Set(['DELIVERED', 'CANCELLED', 'CANCELED']);
+
+const getValidNextStatuses = (
+  currentCode: string,
+  currentId: number,
+  statuses: OrderStatus[]
+): OrderStatus[] => {
+  const code = (currentCode ?? '').toUpperCase();
+
+  // Estado terminal: no hay transiciones
+  if (TERMINAL_CODES.has(code)) return [];
+
+  // Desde WARRANTY: solo listo para entregar, entregada, cancelada
+  if (code === 'WARRANTY') {
+    return statuses.filter((s) => {
+      const sc = s.code.toUpperCase();
+      return sc !== code && (sc === 'READY_FOR_DELIVERY' || TERMINAL_CODES.has(sc));
+    });
+  }
+
+  const currentLevel = STATUS_ORDER[code] ?? 0;
+
+  return statuses.filter((s) => {
+    const sc = s.code.toUpperCase();
+    if (sc === code || s.id === currentId) return false;
+    // Siempre permitir WARRANTY y CANCELLED desde estados no terminales
+    if (sc === 'WARRANTY' || TERMINAL_CODES.has(sc)) return true;
+    // Solo estados con nivel mayor al actual
+    const targetLevel = STATUS_ORDER[sc] ?? 0;
+    return targetLevel > currentLevel;
+  });
+};
 
 const tabs = ['Resumen', 'Prendas', 'Pagos', 'Facturas', 'Entregas'] as const;
 
@@ -121,6 +165,13 @@ export const OrderDetailPage = () => {
     queryFn: api.orderCatalogs
   });
 
+  const { data: cashSummary } = useQuery({
+    queryKey: ['cash-summary'],
+    queryFn: api.cashSummary
+  });
+
+  const isCashOpen = Boolean(cashSummary?.activeSession);
+
   const paymentMutation = useMutation({
     mutationFn: api.createPayment,
     onSuccess: async (payment) => {
@@ -199,7 +250,9 @@ export const OrderDetailPage = () => {
         internalObservations: item.internalObservations,
         unitPrice: item.unitPrice,
         discountAmount: item.discountAmount ?? 0,
+        discountReason: item.discountReason ?? null,
         surchargeAmount: item.surchargeAmount ?? 0,
+        surchargeReason: item.surchargeReason ?? null,
         subtotal: item.subtotal,
         total: item.total
       }))
@@ -336,6 +389,30 @@ export const OrderDetailPage = () => {
                       <span>Precio unitario</span>
                       <strong>{currency(item.unitPrice)}</strong>
                     </div>
+                    {Number(item.discountAmount) > 0 && (
+                      <div className="detail-row">
+                        <span>Descuento</span>
+                        <strong style={{ color: '#16a34a' }}>- {currency(item.discountAmount)}</strong>
+                      </div>
+                    )}
+                    {item.discountReason && (
+                      <div className="detail-row">
+                        <span>Razón descuento</span>
+                        <strong>{item.discountReason}</strong>
+                      </div>
+                    )}
+                    {Number(item.surchargeAmount) > 0 && (
+                      <div className="detail-row">
+                        <span>Recargo</span>
+                        <strong style={{ color: '#dc2626' }}>+ {currency(item.surchargeAmount)}</strong>
+                      </div>
+                    )}
+                    {item.surchargeReason && (
+                      <div className="detail-row">
+                        <span>Razón recargo</span>
+                        <strong>{item.surchargeReason}</strong>
+                      </div>
+                    )}
                     <div className="detail-row">
                       <span>Total</span>
                       <strong>{currency(item.total)}</strong>
@@ -478,7 +555,8 @@ export const OrderDetailPage = () => {
                     await updateStatusMutation.mutateAsync(nextStatusId);
                   }}
                 >
-                  {catalogs?.statuses?.map((status) => (
+                  <option value={data.statusId}>{data.statusName}</option>
+                  {getValidNextStatuses(data.statusCode, data.statusId, catalogs?.statuses ?? []).map((status) => (
                     <option key={status.id} value={status.id}>
                       {status.name}
                     </option>
@@ -534,9 +612,15 @@ export const OrderDetailPage = () => {
                 <strong>{currency(data.subtotal)}</strong>
               </div>
               <div className="detail-row">
-                <span>Descuento</span>
+                <span>Descuento global</span>
                 <strong>{currency(data.discountTotal)}</strong>
               </div>
+              {data.discountReason ? (
+                <div className="detail-row">
+                  <span>Razón del descuento</span>
+                  <strong>{data.discountReason}</strong>
+                </div>
+              ) : null}
               <div className="detail-row">
                 <span>Total</span>
                 <strong>{currency(data.total)}</strong>
@@ -570,22 +654,40 @@ export const OrderDetailPage = () => {
         subtitle={`Creada ${dateTime(data.createdAt)}`}
         actions={
   <div className="row-actions">
-    <Button variant="secondary" onClick={() => setPaymentModal(true)}>
+    <Link className="button button-secondary" to="/ordenes">
+      ← Volver
+    </Link>
+
+    <Button
+      style={{ background: isCashOpen ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none' }}
+      onClick={() => {
+        if (!isCashOpen) {
+          alert('La caja no está abierta. Ve a la sección Caja y ábrela primero.');
+          return;
+        }
+        setPaymentModal(true);
+      }}
+      title={isCashOpen ? 'Registrar pago' : 'Caja cerrada — ábrela primero'}
+    >
       Registrar pago
     </Button>
 
-    <Button
-      variant="secondary"
-      onClick={() => requestProtectedAction('edit')}
-    >
-      Editar orden
-    </Button>
+    <Link className="button button-secondary" to={`/facturas/${data.id}`}>
+      Generar factura
+    </Link>
 
     <Button
-      variant="secondary"
+      style={{ background: '#2563eb', color: '#fff', border: 'none' }}
       onClick={() => navigate(`/entregas?orderId=${data.id}&open=1`)}
     >
       Entregar
+    </Button>
+
+    <Button
+      style={{ background: '#d97706', color: '#fff', border: 'none' }}
+      onClick={() => requestProtectedAction('edit')}
+    >
+      Editar orden
     </Button>
 
     <Button
@@ -594,14 +696,6 @@ export const OrderDetailPage = () => {
     >
       Cancelar orden
     </Button>
-
-    <Link className="button button-secondary" to={`/facturas/${data.id}`}>
-      Generar factura
-    </Link>
-
-    <Link className="button button-secondary" to="/ordenes">
-      Volver
-    </Link>
   </div>
 }
       />
@@ -629,6 +723,11 @@ export const OrderDetailPage = () => {
         title="Registrar pago"
         onClose={() => setPaymentModal(false)}
       >
+        {paymentMutation.isError && (
+          <p className="error-text" style={{ marginBottom: 12 }}>
+            {(paymentMutation.error as Error).message}
+          </p>
+        )}
         <PaymentForm
           orderId={data.id}
           catalogs={catalogs}

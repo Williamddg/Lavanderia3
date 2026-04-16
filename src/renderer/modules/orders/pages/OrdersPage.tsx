@@ -62,6 +62,61 @@ Tu orden *${orderNumber}* ya está *lista para entregar*.
 Puedes pasar por ella cuando desees.`;
 };
 
+// Prioridad visual: menor número = aparece primero
+const STATUS_SORT_PRIORITY: Record<string, number> = {
+  RECEIVED: 1,
+  IN_PROGRESS: 2,
+  READY: 3,
+  READY_FOR_DELIVERY: 4,
+  WARRANTY: 5,
+  CREATED: 6,
+  DELIVERED: 90,
+  CANCELLED: 95,
+  CANCELED: 95
+};
+
+/** Fallback por nombre de estado si aún no hay statusCode en cache */
+const getPriorityByName = (name: string): number => {
+  const n = name.toUpperCase();
+  if (n.includes('RECIB')) return 1;
+  if (n.includes('PROCESO') || n.includes('PROGRESS')) return 2;
+  if (n === 'LISTA' || n === 'READY') return 3;
+  if (n.includes('ENTREGAR') || n.includes('DELIVERY')) return 4;
+  if (n.includes('GARANT')) return 5;
+  if (n.includes('CREA')) return 6;
+  if (n === 'ENTREGADA' || n === 'DELIVERED') return 90;
+  if (n.includes('CANCEL')) return 95;
+  return 50;
+};
+
+const STATUS_ORDER_LEVEL: Record<string, number> = {
+  CREATED: 10, RECEIVED: 10, IN_PROGRESS: 20, READY: 30,
+  READY_FOR_DELIVERY: 40, DELIVERED: 50, WARRANTY: -1
+};
+const TERMINAL = new Set(['DELIVERED', 'CANCELLED', 'CANCELED']);
+
+const validNextStatuses = (
+  currentCode: string,
+  currentId: number,
+  statuses: { id: number; code: string; name: string; color: string }[]
+) => {
+  const code = (currentCode ?? '').toUpperCase();
+  if (TERMINAL.has(code)) return [];
+  if (code === 'WARRANTY') {
+    return statuses.filter((s) => {
+      const sc = s.code.toUpperCase();
+      return sc !== code && (sc === 'READY_FOR_DELIVERY' || TERMINAL.has(sc));
+    });
+  }
+  const level = STATUS_ORDER_LEVEL[code] ?? 0;
+  return statuses.filter((s) => {
+    const sc = s.code.toUpperCase();
+    if (sc === code || s.id === currentId) return false;
+    if (sc === 'WARRANTY' || TERMINAL.has(sc)) return true;
+    return (STATUS_ORDER_LEVEL[sc] ?? 0) > level;
+  });
+};
+
 export const OrdersPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -112,6 +167,7 @@ export const OrdersPage = () => {
               ? {
                   ...order,
                   statusId: selectedStatus.id,
+                  statusCode: selectedStatus.code,
                   statusName: selectedStatus.name,
                   statusColor: selectedStatus.color
                 }
@@ -156,7 +212,7 @@ export const OrdersPage = () => {
   const normalizedSearch = normalizeScannedCode(search);
 
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+    const filtered = orders.filter((order) => {
       const matchesStatus =
         statusFilter === 'ALL' ? true : order.statusId === statusFilter;
 
@@ -173,6 +229,15 @@ export const OrdersPage = () => {
         clientName.includes(normalizedSearch) ||
         statusName.includes(normalizedSearch)
       );
+    });
+
+    return filtered.sort((a, b) => {
+      const codeA = String(a.statusCode ?? '').toUpperCase();
+      const codeB = String(b.statusCode ?? '').toUpperCase();
+      const pa = codeA ? (STATUS_SORT_PRIORITY[codeA] ?? getPriorityByName(a.statusName)) : getPriorityByName(a.statusName);
+      const pb = codeB ? (STATUS_SORT_PRIORITY[codeB] ?? getPriorityByName(b.statusName)) : getPriorityByName(b.statusName);
+      if (pa !== pb) return pa - pb;
+      return b.id - a.id; // mismo estado: más reciente primero
     });
   }, [orders, statusFilter, normalizedSearch]);
 
@@ -257,7 +322,7 @@ export const OrdersPage = () => {
                 <select
                   className="field order-status-select"
                   value={row.statusId}
-                  disabled={updateStatusMutation.isPending}
+                  disabled={updateStatusMutation.isPending || TERMINAL.has((row.statusCode ?? '').toUpperCase())}
                   onChange={async (e) => {
                     const nextStatusId = Number(e.target.value);
                     if (!nextStatusId || nextStatusId === row.statusId) return;
@@ -268,7 +333,8 @@ export const OrdersPage = () => {
                     });
                   }}
                 >
-                  {catalogs?.statuses?.map((status) => (
+                  <option value={row.statusId}>{row.statusName}</option>
+                  {validNextStatuses(row.statusCode ?? '', row.statusId, catalogs?.statuses ?? []).map((status) => (
                     <option key={status.id} value={status.id}>
                       {status.name}
                     </option>
@@ -299,7 +365,7 @@ export const OrdersPage = () => {
                   <Link to={`/ordenes/${row.id}`}>Ver</Link>
                   <Link to={`/ordenes/${row.id}?action=pay`}>Cobrar</Link>
                   <Link to={`/facturas/${row.id}`}>Facturar</Link>
-                  <Link to={`/entregas?orderId=${row.id}`}>Entregar</Link>
+                  <Link to={`/entregas?orderId=${row.id}&open=1`}>Entregar</Link>
                 </div>
               )
             }

@@ -16,6 +16,7 @@ const baseOrderSelection = [
   'o.due_date',
   'o.created_at',
   sql<string>`CONCAT(c.first_name, ' ', c.last_name)`.as('client_name'),
+  sql<string>`s.code`.as('status_code'),
   sql<string>`s.name`.as('status_name'),
   sql<string>`s.color`.as('status_color')
 ] as const;

@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
 
   health: () => ipcRenderer.invoke('app:health'),
   restartApp: () => ipcRenderer.invoke('app:restart'),
+  quitApp: () => ipcRenderer.invoke('app:quit'),
   openExternal: (payload: ExternalLinkPayload) => ipcRenderer.invoke('app:open-external', payload),
   setupCreateDatabase: (input: SetupRootConnectionInput) =>
     ipcRenderer.invoke('setup:create-database', input),

@@ -13,6 +13,21 @@ import { createPaymentsService } from '../payments/service.js';
 import { createInvoicesService } from '../invoices/service.js';
 import { createDeliveriesService } from '../deliveries/service.js';
 
+// Status transition rules: order → priority level (higher = further along)
+const STATUS_ORDER: Record<string, number> = {
+  CREATED: 10,
+  RECEIVED: 10,
+  IN_PROGRESS: 20,
+  READY: 30,
+  READY_FOR_DELIVERY: 40,
+  DELIVERED: 50,
+  CANCELLED: 60,
+  CANCELED: 60,
+  WARRANTY: -1 // special state, handled separately
+};
+
+const TERMINAL_STATES = new Set(['DELIVERED', 'CANCELLED', 'CANCELED']);
+
 const orderItemSchema = z.object({
   garmentTypeId: z.number().nullable(),
   serviceId: z.number().nullable(),
@@ -30,8 +45,10 @@ const orderItemSchema = z.object({
   customerObservations: z.string().nullable(),
   internalObservations: z.string().nullable(),
   unitPrice: z.number().nonnegative(),
-  discountAmount: z.number().nonnegative(),
-  surchargeAmount: z.number().nonnegative(),
+  discountAmount: z.number().int().nonnegative(),
+  discountReason: z.string().nullable().optional(),
+  surchargeAmount: z.number().int().nonnegative(),
+  surchargeReason: z.string().nullable().optional(),
   subtotal: z.number().nonnegative(),
   total: z.number().nonnegative()
 });
@@ -55,6 +72,7 @@ const mapOrder = (row: any): Order => ({
   clientId: row.client_id,
   clientName: row.client_name,
   statusId: row.status_id,
+  statusCode: row.status_code ?? '',
   statusName: row.status_name,
   statusColor: row.status_color,
   notes: row.notes,
@@ -110,7 +128,9 @@ export const createOrdersService = (db: Kysely<Database>) => {
         quantity,
         unitPrice,
         discountAmount,
+        discountReason: item.discountReason ?? null,
         surchargeAmount,
+        surchargeReason: item.surchargeReason ?? null,
         subtotal,
         total
       };
@@ -149,7 +169,9 @@ export const createOrdersService = (db: Kysely<Database>) => {
         internalObservations: item.internal_observations,
         unitPrice: Number(item.unit_price),
         discountAmount: Number(item.discount_amount ?? 0),
+        discountReason: item.discount_reason ?? null,
         surchargeAmount: Number(item.surcharge_amount ?? 0),
+        surchargeReason: item.surcharge_reason ?? null,
         subtotal: Number(item.subtotal),
         total: Number(item.total ?? item.subtotal)
       })),
@@ -238,7 +260,9 @@ export const createOrdersService = (db: Kysely<Database>) => {
             internal_observations: item.internalObservations,
             unit_price: item.unitPrice,
             discount_amount: item.discountAmount,
+            discount_reason: item.discountReason ?? null,
             surcharge_amount: item.surchargeAmount,
+            surcharge_reason: item.surchargeReason ?? null,
             subtotal: item.subtotal,
             total: item.total
           }))
@@ -365,7 +389,9 @@ export const createOrdersService = (db: Kysely<Database>) => {
             internal_observations: item.internalObservations,
             unit_price: item.unitPrice,
             discount_amount: item.discountAmount,
+            discount_reason: item.discountReason ?? null,
             surcharge_amount: item.surchargeAmount,
+            surcharge_reason: item.surchargeReason ?? null,
             subtotal: item.subtotal,
             total: item.total
           }))
@@ -494,12 +520,47 @@ export const createOrdersService = (db: Kysely<Database>) => {
 
     const order = await db
       .selectFrom('orders')
-      .select(['id'])
-      .where('id', '=', orderId)
+      .innerJoin('order_statuses as os', 'os.id', 'orders.status_id')
+      .select(['orders.id', 'os.code as current_code', 'os.name as current_name'])
+      .where('orders.id', '=', orderId)
       .executeTakeFirst();
 
     if (!order) {
       throw new Error('Orden no encontrada.');
+    }
+
+    const currentCode = String(order.current_code ?? '').toUpperCase();
+    const targetCode = String(status.code ?? '').toUpperCase();
+
+    // No permitir cambio al mismo estado
+    if (currentCode === targetCode) {
+      throw new Error('La orden ya está en ese estado.');
+    }
+
+    // Estados terminales no pueden cambiar
+    if (TERMINAL_STATES.has(currentCode)) {
+      throw new Error(`La orden ya está en un estado final (${order.current_name}) y no puede cambiar.`);
+    }
+
+    // Desde EN GARANTÍA solo se puede ir a Listo para entregar, Entregada o Cancelada
+    if (currentCode === 'WARRANTY') {
+      const warrantyAllowed = new Set(['READY_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'CANCELED']);
+      if (!warrantyAllowed.has(targetCode)) {
+        throw new Error('Desde "En garantía" solo puedes pasar a "Listo para entregar", "Entregada" o "Cancelada".');
+      }
+    } else {
+      // Para estados normales: no permitir retroceder
+      const currentLevel = STATUS_ORDER[currentCode] ?? 0;
+      const targetLevel = STATUS_ORDER[targetCode] ?? 0;
+
+      // WARRANTY y CANCELLED/CANCELED siempre se permiten desde estados no-terminales
+      const isSpecialTarget = targetCode === 'WARRANTY' || TERMINAL_STATES.has(targetCode);
+
+      if (!isSpecialTarget && targetLevel <= currentLevel) {
+        throw new Error(
+          `No puedes regresar de "${order.current_name}" a "${status.name}". Los estados solo avanzan hacia adelante.`
+        );
+      }
     }
 
     await db.transaction().execute(async (trx) => {

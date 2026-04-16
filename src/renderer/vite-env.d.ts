@@ -68,6 +68,7 @@ declare global {
 
       health: () => Promise<unknown>;
       restartApp: () => Promise<unknown>;
+      quitApp: () => Promise<unknown>;
       openExternal: (payload: ExternalLinkPayload) => Promise<unknown>;
       setupCreateDatabase: (input: SetupRootConnectionInput) => Promise<unknown>;
       setupInitializeSchema: (input: SetupRootConnectionInput) => Promise<unknown>;

@@ -126,7 +126,9 @@ export interface OrderItemsTable {
   internal_observations: string | null;
   unit_price: number;
   discount_amount: number;
+  discount_reason: string | null;
   surcharge_amount: number;
+  surcharge_reason: string | null;
   subtotal: number;
   total: number;
 }

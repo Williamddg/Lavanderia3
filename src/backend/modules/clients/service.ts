@@ -35,6 +35,17 @@ export const createClientsService = (db: Kysely<Database>) => {
 
     async create(input: ClientInput): Promise<Client> {
       const parsed = schema.parse(input);
+
+      const existing = await db
+        .selectFrom('clients')
+        .select('id')
+        .where('phone', '=', parsed.phone)
+        .executeTakeFirst();
+
+      if (existing) {
+        throw new Error('El número de teléfono ya está registrado en otro cliente. Revisa el teléfono ingresado.');
+      }
+
       const count = await repository.count();
       const code = `CLI-${String(Number(count.count) + 1).padStart(5, '0')}`;
       const result = await db.insertInto('clients').values({
@@ -54,6 +65,18 @@ export const createClientsService = (db: Kysely<Database>) => {
 
     async update(id: number, input: ClientInput): Promise<Client> {
       const parsed = schema.parse(input);
+
+      const existing = await db
+        .selectFrom('clients')
+        .select('id')
+        .where('phone', '=', parsed.phone)
+        .where('id', '!=', id)
+        .executeTakeFirst();
+
+      if (existing) {
+        throw new Error('El número de teléfono ya está registrado en otro cliente. Revisa el teléfono ingresado.');
+      }
+
       await repository.update(id, {
         first_name: parsed.firstName,
         last_name: parsed.lastName,

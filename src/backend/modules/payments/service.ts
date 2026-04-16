@@ -51,6 +51,18 @@ export const createPaymentsService = (db: Kysely<Database>) => {
   const create = async (input: PaymentInput): Promise<Payment> => {
     const parsed = schema.parse(input);
 
+    const activeCashSession = await db
+      .selectFrom('cash_sessions')
+      .select('id')
+      .where('status', '=', 'open')
+      .executeTakeFirst();
+
+    if (!activeCashSession) {
+      throw new Error(
+        'La caja no está abierta. Dirígete a la sección Caja y ábrela antes de registrar pagos.'
+      );
+    }
+
     const order = await db
       .selectFrom('orders')
       .selectAll()

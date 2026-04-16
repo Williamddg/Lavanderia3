@@ -170,6 +170,14 @@ export const registerIpc = () => {
   );
 
   ipcMain.handle(
+    'app:quit',
+    wrap(async () => {
+      app.quit();
+      return { quit: true };
+    })
+  );
+
+  ipcMain.handle(
     'app:open-external',
     wrap(async ({ url }: ExternalLinkPayload) => {
       await shell.openExternal(url);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '@renderer/services/api';
 import type { SessionUser } from '@shared/types';
 
+
 type Props = {
   onLogin: (user: SessionUser) => void;
 };
@@ -124,8 +125,23 @@ export const LoginPage = ({ onLogin }: Props) => {
               </button>
             </form>
 
-            <div className="auth-footer-note">
+            <div className="auth-footer-note" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>SISTETECNI Textile suite</span>
+              <button
+                type="button"
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 6,
+                  padding: '4px 12px',
+                  fontSize: 12,
+                  color: '#6b7280',
+                  cursor: 'pointer'
+                }}
+                onClick={() => api.quitApp()}
+              >
+                Cerrar app
+              </button>
             </div>
           </div>
         </div>

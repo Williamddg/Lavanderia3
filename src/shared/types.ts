@@ -155,7 +155,9 @@ export type OrderItem = {
   internalObservations: string | null;
   unitPrice: number;
   discountAmount: number;
+  discountReason: string | null;
   surchargeAmount: number;
+  surchargeReason: string | null;
   subtotal: number;
   total: number;
 };
@@ -168,6 +170,7 @@ export type Order = {
   clientId: number;
   clientName: string;
   statusId: number;
+  statusCode: string;
   statusName: string;
   statusColor: string;
   notes: string | null;
