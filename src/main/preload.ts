@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
   deleteClient: (id: number) => ipcRenderer.invoke('clients:delete', id),
 
   listOrders: () => ipcRenderer.invoke('orders:list'),
+  searchOrders: (term: string, limit?: number) => ipcRenderer.invoke('orders:search', term, limit),
   getOrderDetail: (id: number) => ipcRenderer.invoke('orders:detail', id),
   getOrderCatalogs: () => ipcRenderer.invoke('orders:catalogs'),
   createOrder: (input: OrderInput) => ipcRenderer.invoke('orders:create', input),
@@ -100,6 +101,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
   createPaymentBatch: (input: BatchPaymentInput) => ipcRenderer.invoke('payments:create-batch', input),
 
   listInvoices: () => ipcRenderer.invoke('invoices:list'),
+  searchInvoices: (term: string, limit?: number) => ipcRenderer.invoke('invoices:search', term, limit),
   getInvoiceDetail: (id: number) => ipcRenderer.invoke('invoices:detail', id),
   createInvoiceFromOrder: (orderId: number) => ipcRenderer.invoke('invoices:create-from-order', orderId),
 
@@ -115,6 +117,10 @@ contextBridge.exposeInMainWorld('desktopApi', {
   createExpense: (input: { categoryId: number; paymentMethodId: number; amount: number; description: string; expenseDate: string }) =>
     ipcRenderer.invoke('expenses:create', input),
   listExpenseCategories: () => ipcRenderer.invoke('expenses:categories'),
+
+  listSellerUsers: () => ipcRenderer.invoke('users:list-sellers'),
+  updateSellerUser: (id: number, input: { fullName: string; username: string; password?: string | null }) =>
+    ipcRenderer.invoke('users:update-seller', id, input),
 
   listDeliveries: () => ipcRenderer.invoke('deliveries:list'),
   createDelivery: (input: DeliveryInput) => ipcRenderer.invoke('deliveries:create', input),

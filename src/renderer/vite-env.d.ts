@@ -64,6 +64,11 @@ declare global {
         expenseDate: string;
       }) => Promise<unknown>;
       listExpenseCategories: () => Promise<unknown>;
+      listSellerUsers: () => Promise<unknown>;
+      updateSellerUser: (
+        id: number,
+        input: { fullName: string; username: string; password?: string | null }
+      ) => Promise<unknown>;
 
       listServices: (activeOnly?: boolean) => Promise<Service[]>;
       createService: (input: ServiceInput) => Promise<Service>;
@@ -93,6 +98,7 @@ declare global {
       deleteClient: (id: number) => Promise<unknown>;
 
       listOrders: () => Promise<unknown>;
+      searchOrders: (term: string, limit?: number) => Promise<unknown>;
       getOrderDetail: (id: number) => Promise<unknown>;
       getOrderCatalogs: () => Promise<unknown>;
       createOrder: (input: OrderInput) => Promise<unknown>;
@@ -103,6 +109,7 @@ declare global {
       createPaymentBatch: (input: BatchPaymentInput) => Promise<unknown>;
 
       listInvoices: () => Promise<unknown>;
+      searchInvoices: (term: string, limit?: number) => Promise<unknown>;
       getInvoiceDetail: (id: number) => Promise<unknown>;
       createInvoiceFromOrder: (orderId: number) => Promise<unknown>;
 

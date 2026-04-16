@@ -41,6 +41,8 @@ import type {
   SetupInitializeProgress,
   SetupInitializeSchemaResult,
   SetupRootConnectionInput,
+  SellerUser,
+  SellerUserUpdateInput,
 } from '@shared/types';
 
 async function unwrap<T>(promise: Promise<unknown>): Promise<T> {
@@ -143,6 +145,8 @@ export const api = {
   deleteClient: (id: number) => unwrap<{ id: number }>(window.desktopApi.deleteClient(id)),
 
   listOrders: () => unwrap<Order[]>(window.desktopApi.listOrders()),
+  searchOrders: (term: string, limit = 8) =>
+    unwrap<Order[]>(window.desktopApi.searchOrders(term, limit)),
   orderDetail: (id: number) => unwrap<OrderDetail>(window.desktopApi.getOrderDetail(id)),
   orderCatalogs: () => unwrap<CatalogsPayload>(window.desktopApi.getOrderCatalogs()),
   createOrder: (input: OrderInput) => unwrap<OrderDetail>(window.desktopApi.createOrder(input)),
@@ -158,6 +162,8 @@ export const api = {
   createPaymentBatch: (input: BatchPaymentInput) => unwrap<Payment[]>(window.desktopApi.createPaymentBatch(input)),
 
   listInvoices: () => unwrap<Invoice[]>(window.desktopApi.listInvoices()),
+  searchInvoices: (term: string, limit = 8) =>
+    unwrap<Invoice[]>(window.desktopApi.searchInvoices(term, limit)),
   invoiceDetail: (id: number) => unwrap<InvoiceDetail>(window.desktopApi.getInvoiceDetail(id)),
   createInvoiceFromOrder: (orderId: number) => unwrap<InvoiceDetail>(window.desktopApi.createInvoiceFromOrder(orderId)),
 
@@ -169,6 +175,10 @@ export const api = {
 
   listDeliveries: () => unwrap<DeliveryRecord[]>(window.desktopApi.listDeliveries()),
   createDelivery: (input: DeliveryInput) => unwrap<DeliveryRecord>(window.desktopApi.createDelivery(input)),
+
+  listSellerUsers: () => unwrap<SellerUser[]>(window.desktopApi.listSellerUsers()),
+  updateSellerUser: (id: number, input: SellerUserUpdateInput) =>
+    unwrap<SellerUser>(window.desktopApi.updateSellerUser(id, input)),
 
   dashboardSummary: () => unwrap<DashboardSummary>(window.desktopApi.getDashboardSummary()),
 

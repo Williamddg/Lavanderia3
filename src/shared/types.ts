@@ -111,6 +111,7 @@ export type Client = {
   email: string | null;
   address: string | null;
   notes: string | null;
+  ordersCount?: number;
   createdAt: string;
 };
 
@@ -442,6 +443,19 @@ export type GlobalSearchResult = {
   clients: Array<Pick<Client, 'id' | 'firstName' | 'lastName' | 'phone'>>;
   orders: Array<Pick<Order, 'id' | 'orderNumber' | 'clientName' | 'statusName' | 'total' | 'balanceDue'>>;
   invoices: Array<Pick<Invoice, 'id' | 'invoiceNumber' | 'orderId' | 'clientName' | 'total' | 'balanceDue'>>;
+};
+
+export type SellerUser = {
+  id: number;
+  fullName: string;
+  username: string;
+  password: string;
+};
+
+export type SellerUserUpdateInput = {
+  fullName: string;
+  username: string;
+  password?: string | null;
 };
 
 

@@ -60,6 +60,20 @@ const buildCashCloseWhatsappMessage = (data: CashCloseResult) => {
         .join('\n')
     : '- Sin movimientos';
 
+  const expensesByMethod = data.expensesByMethod ?? [];
+  const expensesText = expensesByMethod.length
+    ? expensesByMethod
+        .map(
+          (item) =>
+            `- ${item.methodName}: ${new Intl.NumberFormat('es-CO', {
+              style: 'currency',
+              currency: 'COP',
+              maximumFractionDigits: 0
+            }).format(item.amount)}`
+        )
+        .join('\n')
+    : '- Sin gastos';
+
   const deliveredText = deliveredOrders.length
     ? deliveredOrders
         .map(
@@ -120,6 +134,9 @@ const buildCashCloseWhatsappMessage = (data: CashCloseResult) => {
 *TOTAL POR MÉTODO*
 ${methodsText}
 
+*GASTOS POR MÉTODO*
+${expensesText}
+
 *ÓRDENES ENTREGADAS*
 ${deliveredText}
 
@@ -134,6 +151,16 @@ const formatMoney = (value: number) =>
     maximumFractionDigits: 0
   }).format(Number(value ?? 0));
 
+const formatMovementTypeLabel = (raw: string) => {
+  const code = String(raw ?? '').toUpperCase();
+  if (code === 'EXPENSE_OUT') return 'Salida por gasto';
+  if (code === 'PAYMENT_OUT') return 'Salida por devolución';
+  if (code === 'PAYMENT_IN') return 'Ingreso por pago';
+  if (code.endsWith('_OUT')) return 'Salida de caja';
+  if (code.endsWith('_IN')) return 'Ingreso a caja';
+  return raw;
+};
+
 const escapeHtml = (value: string) =>
   String(value)
     .replaceAll('&', '&amp;')
@@ -146,6 +173,7 @@ const buildThermalCloseHtml = (data: CashCloseResult) => {
   const deliveredOrders = data.deliveredOrders ?? [];
   const sessionPayments = data.sessionPayments ?? [];
   const totalsByMethod = data.totalsByMethod ?? [];
+  const expensesByMethod = data.expensesByMethod ?? [];
 
   const methodsHtml = totalsByMethod.length
     ? totalsByMethod
@@ -178,6 +206,19 @@ const buildThermalCloseHtml = (data: CashCloseResult) => {
         )
         .join('')
     : `<div class="small center">No hubo órdenes entregadas en esta sesión.</div>`;
+
+  const expensesHtml = expensesByMethod.length
+    ? expensesByMethod
+        .map(
+          (item) => `
+            <div class="row">
+              <span>${item.methodName}</span>
+              <span>${formatMoney(item.amount)}</span>
+            </div>
+          `
+        )
+        .join('')
+    : `<div class="small center">Sin gastos en la sesión.</div>`;
 
   const paymentsHtml = sessionPayments.length
     ? sessionPayments
@@ -339,12 +380,18 @@ const buildThermalCloseHtml = (data: CashCloseResult) => {
         <div class="row"><span>Apertura</span><span>${formatMoney(data.openingAmount)}</span></div>
         <div class="row"><span>Declarado</span><span>${formatMoney(data.declaredAmount)}</span></div>
         <div class="row"><span>Sistema</span><span>${formatMoney(data.systemAmount)}</span></div>
+        <div class="row"><span>Gastos sesión</span><span>${formatMoney(data.totalExpenses ?? 0)}</span></div>
         <div class="row"><span>Diferencia</span><span>${formatMoney(data.differenceAmount)}</span></div>
 
         <div class="line"></div>
 
         <div class="section-title">Totales por método</div>
         ${methodsHtml}
+
+        <div class="line"></div>
+
+        <div class="section-title">Gastos por método</div>
+        ${expensesHtml}
 
         <div class="line"></div>
 
@@ -669,6 +716,11 @@ export const CashPage = () => {
               accent="#5fae88"
             />
             <SummaryCard
+              title="Gastos sesión"
+              value={currency(data.totalExpenses ?? 0)}
+              accent="#c97373"
+            />
+            <SummaryCard
               title="Sistema"
               value={currency(systemAmount)}
               accent="#6786a8"
@@ -740,6 +792,11 @@ export const CashPage = () => {
               <div className="detail-row">
                 <span>Ventas de la sesión</span>
                 <strong>{currency(totalSessionSales)}</strong>
+              </div>
+
+              <div className="detail-row">
+                <span>Gastos de la sesión</span>
+                <strong>{currency(data.totalExpenses ?? 0)}</strong>
               </div>
 
               <div className="detail-row">
@@ -838,6 +895,25 @@ export const CashPage = () => {
           </div>
 
           <div className="card-panel">
+            <h3>Gastos por método (sesión)</h3>
+            <DataTable
+              rows={data.expensesByMethod}
+              columns={[
+                {
+                  key: 'method',
+                  header: 'Método',
+                  render: (row) => row.methodName
+                },
+                {
+                  key: 'amount',
+                  header: 'Monto',
+                  render: (row) => currency(row.amount)
+                }
+              ]}
+            />
+          </div>
+
+          <div className="card-panel">
             <h3>Movimientos recientes</h3>
             <DataTable
               rows={data.recentMovements}
@@ -845,7 +921,7 @@ export const CashPage = () => {
                 {
                   key: 'type',
                   header: 'Tipo',
-                  render: (row) => row.movementType
+                  render: (row) => formatMovementTypeLabel(row.movementType)
                 },
                 {
                   key: 'amount',

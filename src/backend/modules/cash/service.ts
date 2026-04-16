@@ -118,6 +118,24 @@ export const createCashService = (db: Kysely<Database>) => ({
       .groupBy('pm.name')
       .execute();
 
+    const expensesByMethod = await db
+      .selectFrom('expenses as e')
+      .leftJoin('payment_methods as pm', 'pm.id', 'e.payment_method_id')
+      .select([
+        sql<string>`COALESCE(pm.name, 'Sin método')`.as('method_name'),
+        (eb) => eb.fn.sum<number>('e.amount').as('amount')
+      ])
+      .where('e.cash_session_id', '=', active.id)
+      .where('e.created_at', '>=', active.opened_at)
+      .where('e.created_at', '<=', closureMoment)
+      .groupBy(sql`COALESCE(pm.name, 'Sin método')`)
+      .execute();
+
+    const totalExpenses = expensesByMethod.reduce(
+      (sum, row) => sum + Number(row.amount ?? 0),
+      0
+    );
+
     const movementTotals = await db
       .selectFrom('cash_movements')
       .select([
@@ -272,6 +290,11 @@ export const createCashService = (db: Kysely<Database>) => ({
         methodName: item.method_name,
         amount: Number(item.amount ?? 0)
       })),
+      totalExpenses,
+      expensesByMethod: expensesByMethod.map((item) => ({
+        methodName: item.method_name,
+        amount: Number(item.amount ?? 0)
+      })),
       deliveredOrders: deliveredOrders.map((item) => ({
         orderId: Number(item.order_id),
         orderNumber: item.order_number,
@@ -326,6 +349,8 @@ export const createCashService = (db: Kysely<Database>) => ({
             }
           : null,
         totalsByMethod: [],
+        totalExpenses: 0,
+        expensesByMethod: [],
         recentMovements: []
       };
     }
@@ -339,6 +364,18 @@ export const createCashService = (db: Kysely<Database>) => ({
       ])
       .where('p.created_at', '>=', active.opened_at)
       .groupBy('pm.name')
+      .execute();
+
+    const expensesByMethod = await db
+      .selectFrom('expenses as e')
+      .leftJoin('payment_methods as pm', 'pm.id', 'e.payment_method_id')
+      .select([
+        sql<string>`COALESCE(pm.name, 'Sin método')`.as('method_name'),
+        (eb) => eb.fn.sum<number>('e.amount').as('amount')
+      ])
+      .where('e.cash_session_id', '=', active.id)
+      .where('e.created_at', '>=', active.opened_at)
+      .groupBy(sql`COALESCE(pm.name, 'Sin método')`)
       .execute();
 
     const recentMovements = await db
@@ -369,6 +406,10 @@ export const createCashService = (db: Kysely<Database>) => ({
 
     const openingAmount = Number(active.opening_amount);
     const systemAmount = openingAmount + movementNet;
+    const totalExpenses = expensesByMethod.reduce(
+      (sum, row) => sum + Number(row.amount ?? 0),
+      0
+    );
 
     return {
       activeSession: {
@@ -392,6 +433,11 @@ export const createCashService = (db: Kysely<Database>) => ({
           }
         : null,
       totalsByMethod: totalsByMethod.map((item) => ({
+        methodName: item.method_name,
+        amount: Number(item.amount ?? 0)
+      })),
+      totalExpenses,
+      expensesByMethod: expensesByMethod.map((item) => ({
         methodName: item.method_name,
         amount: Number(item.amount ?? 0)
       })),

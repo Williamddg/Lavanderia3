@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@renderer/services/api';
 import { Button, DataTable, Input, PageHeader, SummaryCard } from '@renderer/ui/components';
@@ -264,13 +265,23 @@ export const ReportsPage = () => {
 
   const allSections = useMemo(
     () => [
-      { id: 'day' as const, title: 'Reporte Diario', data: dayQuery.data },
-      { id: 'month' as const, title: 'Reporte Mes Actual', data: monthQuery.data },
-      { id: 'year' as const, title: 'Reporte Anual', data: yearQuery.data },
-      { id: 'custom' as const, title: 'Reporte Personalizado', data: customQuery.data }
+      { id: 'day' as const, title: `Reporte diario (${todayKey} 00:00 a ${todayKey} 23:59)`, data: dayQuery.data },
+      { id: 'month' as const, title: `Reporte mensual (${monthStartKey} 00:00 a ${todayKey} 23:59)`, data: monthQuery.data },
+      { id: 'year' as const, title: `Reporte anual (${yearStartKey} 00:00 a ${todayKey} 23:59)`, data: yearQuery.data },
+      { id: 'custom' as const, title: `Reporte personalizado (${appliedFrom} 00:00 a ${appliedTo} 23:59)`, data: customQuery.data }
     ],
-    [dayQuery.data, monthQuery.data, yearQuery.data, customQuery.data]
+    [dayQuery.data, monthQuery.data, yearQuery.data, customQuery.data, appliedFrom, appliedTo]
   );
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (exportMode) {
+      html.classList.add('reports-export-print');
+    } else {
+      html.classList.remove('reports-export-print');
+    }
+    return () => html.classList.remove('reports-export-print');
+  }, [exportMode]);
 
   const exportPdf = async (mode: ReportMode, title: string) => {
     setExportMode(mode);
@@ -364,6 +375,39 @@ export const ReportsPage = () => {
       {dayQuery.isLoading || monthQuery.isLoading || yearQuery.isLoading || customQuery.isLoading ? (
         <div className="card-panel">Cargando reportes...</div>
       ) : null}
+
+      <style>
+        {`
+          @media print {
+            html.reports-export-print {
+              background: #fff !important;
+            }
+
+            html.reports-export-print body {
+              width: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #fff !important;
+              font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+              font-size: 12px !important;
+              letter-spacing: normal !important;
+              font-weight: 400 !important;
+            }
+
+            html.reports-export-print .page-content {
+              padding: 0 !important;
+              overflow: visible !important;
+            }
+
+            html.reports-export-print .card-panel {
+              border-radius: 12px !important;
+              box-shadow: none !important;
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+          }
+        `}
+      </style>
     </section>
   );
 };

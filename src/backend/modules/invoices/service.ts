@@ -359,6 +359,68 @@ export const createInvoicesService = (db: Kysely<Database>) => {
     };
   };
 
+  const search = async (term: string, limit = 8): Promise<Invoice[]> => {
+    const normalized = String(term ?? '').trim();
+    if (!normalized) return [];
+    const safeLimit = Math.max(1, Math.min(30, Number(limit) || 8));
+    const likeTerm = `%${normalized}%`;
+
+    const company = await db
+      .selectFrom('company_settings')
+      .selectAll()
+      .orderBy('id')
+      .limit(1)
+      .executeTakeFirst();
+
+    const rows = await db
+      .selectFrom('invoices as i')
+      .innerJoin('clients as c', 'c.id', 'i.client_id')
+      .innerJoin('orders as o', 'o.id', 'i.order_id')
+      .select([
+        'i.id',
+        'i.invoice_number',
+        'i.order_id',
+        'i.client_id',
+        'i.subtotal',
+        'i.tax_total',
+        'i.total',
+        'i.legal_text',
+        'i.created_at',
+        'o.due_date',
+        'o.notes as order_notes',
+        'o.paid_total',
+        'o.balance_due',
+        'o.order_number',
+        sql<string>`c.first_name`.as('first_name'),
+        sql<string>`c.last_name`.as('last_name'),
+        sql<string | null>`c.phone`.as('client_phone')
+      ])
+      .where((eb) =>
+        eb.or([
+          eb('i.invoice_number', 'like', likeTerm),
+          eb('o.order_number', 'like', likeTerm),
+          sql<boolean>`CONCAT(c.first_name, ' ', c.last_name) LIKE ${likeTerm}`
+        ])
+      )
+      .orderBy('i.id desc')
+      .limit(safeLimit)
+      .execute();
+
+    return rows.map((row) =>
+      mapInvoice({
+        ...row,
+        client_name: `${row.first_name} ${row.last_name}`,
+        ticket_code: buildTicketCode(row.order_number),
+        company_name: company?.company_name ?? null,
+        company_phone: company?.phone ?? null,
+        company_address: company?.address ?? null,
+        company_nit: company?.nit ?? null,
+        company_logo: company?.logo_base64 ?? null,
+        company_policies: company?.invoice_policies ?? null
+      })
+    );
+  };
+
   const createFromOrder = async (orderId: number): Promise<InvoiceDetail> => {
     const order = await db
       .selectFrom('orders')
@@ -485,5 +547,5 @@ export const createInvoicesService = (db: Kysely<Database>) => {
     return detail(invoiceId);
   };
 
-  return { list, detail, createFromOrder };
+  return { list, detail, createFromOrder, search };
 };

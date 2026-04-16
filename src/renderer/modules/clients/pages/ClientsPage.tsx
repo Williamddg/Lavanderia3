@@ -71,7 +71,18 @@ export const ClientsPage = () => {
                 render: (row) => (
                   <div className="row-actions">
                     <Button variant="secondary" onClick={() => editModal.open(row)}>Editar</Button>
-                    <Button variant="danger" onClick={() => deleteMutation.mutate(row.id)}>Eliminar</Button>
+                    <Button
+                      variant="danger"
+                      disabled={Number(row.ordersCount ?? 0) > 0}
+                      onClick={() => deleteMutation.mutate(row.id)}
+                      title={
+                        Number(row.ordersCount ?? 0) > 0
+                          ? `No se puede eliminar: tiene ${row.ordersCount} orden(es).`
+                          : 'Eliminar cliente'
+                      }
+                    >
+                      Eliminar
+                    </Button>
                   </div>
                 )
               }
@@ -80,7 +91,7 @@ export const ClientsPage = () => {
         </div>
 
         <div className="card-panel">
-          <PageHeader title="Nuevo cliente" subtitle="Alta rápida con validaciones básicas." />
+          <PageHeader title="Nuevo cliente" />
           <ClientForm key={createFormKey} onSubmit={(value) => createMutation.mutate(value)} />
           {createMutation.isError && (
             <p className="error-text">{(createMutation.error as Error).message}</p>
@@ -105,6 +116,10 @@ export const ClientsPage = () => {
           <p className="error-text">{(updateMutation.error as Error).message}</p>
         )}
       </Modal>
+
+      {deleteMutation.isError && (
+        <p className="error-text">{(deleteMutation.error as Error).message}</p>
+      )}
     </section>
   );
 };

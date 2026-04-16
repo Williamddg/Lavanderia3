@@ -14,6 +14,7 @@ import { servicesManager } from '../services/services-manager.js';
 import { createExpensesService } from '../../backend/modules/expenses/service.js';
 import { createWarrantiesService } from '../../backend/modules/warranties/service.js';
 import { createReportsService } from '../../backend/modules/reports/service.js';
+import { createUsersService } from '../../backend/modules/users/service.js';
 import { printerService } from '../services/printer-service.js';
 import { backupService } from '../services/backup-service.js';
 import { licenseService } from '../services/license-service.js';
@@ -402,6 +403,13 @@ export const registerIpc = () => {
   );
 
   ipcMain.handle(
+    'orders:search',
+    wrap(async (term: string, limit?: number) =>
+      createOrdersService(await databaseManager.getDb()).search(term, limit)
+    )
+  );
+
+  ipcMain.handle(
     'orders:detail',
     wrap(async (id: number) =>
       createOrdersService(await databaseManager.getDb()).detail(id)
@@ -468,6 +476,13 @@ export const registerIpc = () => {
   );
 
   ipcMain.handle(
+    'invoices:search',
+    wrap(async (term: string, limit?: number) =>
+      createInvoicesService(await databaseManager.getDb()).search(term, limit)
+    )
+  );
+
+  ipcMain.handle(
     'invoices:detail',
     wrap(async (id: number) =>
       createInvoicesService(await databaseManager.getDb()).detail(id)
@@ -518,6 +533,18 @@ export const registerIpc = () => {
     'expenses:categories',
     wrap(async () =>
       createExpensesService(await databaseManager.getDb()).listCategories()
+    )
+  );
+
+  ipcMain.handle(
+    'users:list-sellers',
+    wrap(async () => createUsersService(await databaseManager.getDb()).listSellers())
+  );
+
+  ipcMain.handle(
+    'users:update-seller',
+    wrap(async (id: number, input) =>
+      createUsersService(await databaseManager.getDb()).updateSeller(id, input)
     )
   );
 

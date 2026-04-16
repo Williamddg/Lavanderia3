@@ -22,6 +22,7 @@ const mapClient = (row: { id: number; code: string; first_name: string; last_nam
   email: row.email,
   address: row.address,
   notes: row.notes,
+  ordersCount: Number((row as any).orders_count ?? 0),
   createdAt: row.created_at.toISOString()
 });
 
@@ -30,7 +31,36 @@ export const createClientsService = (db: Kysely<Database>) => {
 
   return {
     async list(): Promise<Client[]> {
-      return (await repository.list()).map(mapClient);
+      const rows = await db
+        .selectFrom('clients as c')
+        .leftJoin('orders as o', 'o.client_id', 'c.id')
+        .select([
+          'c.id',
+          'c.code',
+          'c.first_name',
+          'c.last_name',
+          'c.phone',
+          'c.email',
+          'c.address',
+          'c.notes',
+          'c.created_at',
+          (eb) => eb.fn.count<number>('o.id').as('orders_count')
+        ])
+        .groupBy([
+          'c.id',
+          'c.code',
+          'c.first_name',
+          'c.last_name',
+          'c.phone',
+          'c.email',
+          'c.address',
+          'c.notes',
+          'c.created_at'
+        ])
+        .orderBy('c.id desc')
+        .execute();
+
+      return rows.map(mapClient);
     },
 
     async searchByName(term: string, limit = 40): Promise<Client[]> {
@@ -115,6 +145,19 @@ export const createClientsService = (db: Kysely<Database>) => {
     },
 
     async remove(id: number) {
+      const ordersCount = await db
+        .selectFrom('orders')
+        .select((eb) => eb.fn.count<number>('id').as('count'))
+        .where('client_id', '=', id)
+        .executeTakeFirstOrThrow();
+
+      const linkedOrders = Number(ordersCount.count ?? 0);
+      if (linkedOrders > 0) {
+        throw new Error(
+          `No se puede eliminar el cliente porque tiene ${linkedOrders} orden(es) creada(s).`
+        );
+      }
+
       await repository.delete(id);
       await db.insertInto('audit_logs').values({ action: 'CLIENT_DELETE', entity_type: 'client', entity_id: String(id) }).execute();
       return { id };

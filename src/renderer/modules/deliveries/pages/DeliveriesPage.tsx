@@ -294,25 +294,15 @@ export const DeliveriesPage = () => {
     title: string,
     companyName: string,
     generatedAt: string,
-    summary: { orders: number; total: number; paid: number; balance: number },
+    summary: { orders: number; totalItems: number },
     rows: Array<{
       orderNumber: string;
       clientName: string;
       dueDate: string | null;
-      total: number;
-      paidTotal: number;
-      balanceDue: number;
       statusName: string;
       itemsCount?: number;
     }>
   ) => {
-    const money = (v: number) =>
-      new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        maximumFractionDigits: 0
-      }).format(Number(v ?? 0));
-
     const body = rows.length
       ? rows
           .map(
@@ -320,10 +310,9 @@ export const DeliveriesPage = () => {
               <div class="item">
               <div><strong>${idx + 1}. ${row.orderNumber}</strong></div>
               <div>${row.clientName}</div>
-              <div>Ítems: ${Number(row.itemsCount ?? 0)}</div>
+              <div>Prendas: ${Number(row.itemsCount ?? 0)}</div>
               <div>Estado: ${row.statusName}</div>
               <div>Fecha promesa: ${row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-CO') : '—'}</div>
-              <div>Total: ${money(row.total)} | Abono: ${money(row.paidTotal)} | Saldo: ${money(row.balanceDue)}</div>
               </div>
             `
           )
@@ -353,9 +342,7 @@ export const DeliveriesPage = () => {
           <h1>${title}</h1>
           <div class="resume">
             <div><span>Órdenes</span><strong>${summary.orders}</strong></div>
-            <div><span>Total</span><strong>${money(summary.total)}</strong></div>
-            <div><span>Abonos</span><strong>${money(summary.paid)}</strong></div>
-            <div><span>Saldo</span><strong>${money(summary.balance)}</strong></div>
+            <div><span>Total prendas</span><strong>${summary.totalItems}</strong></div>
           </div>
           ${body}
         </div>
@@ -369,9 +356,6 @@ export const DeliveriesPage = () => {
       orderNumber: string;
       clientName: string;
       dueDate: string | null;
-      total: number;
-      paidTotal: number;
-      balanceDue: number;
       statusName: string;
     }>
   ) => {
@@ -382,19 +366,21 @@ export const DeliveriesPage = () => {
         const order = orders.find((item) => item.orderNumber === row.orderNumber);
         if (!order) return { ...row, itemsCount: 0 };
         const detail = await api.orderDetail(order.id).catch(() => null);
-        return { ...row, itemsCount: detail?.items?.length ?? 0 };
+        const itemsCount = (detail?.items ?? []).reduce(
+          (sum, item) => sum + Number(item.quantity ?? 0),
+          0
+        );
+        return { ...row, itemsCount };
       })
     );
 
     const summary = enriched.reduce(
       (acc, row) => {
         acc.orders += 1;
-        acc.total += Number(row.total ?? 0);
-        acc.paid += Number(row.paidTotal ?? 0);
-        acc.balance += Number(row.balanceDue ?? 0);
+        acc.totalItems += Number(row.itemsCount ?? 0);
         return acc;
       },
-      { orders: 0, total: 0, paid: 0, balance: 0 }
+      { orders: 0, totalItems: 0 }
     );
 
     const win = window.open('', '_blank', 'width=430,height=900');

@@ -22,6 +22,7 @@ import { WarrantiesPage } from './modules/warranties/pages/WarrantiesPage';
 import { ReportsPage } from './modules/reports/pages/ReportsPage';
 import { WhatsappPage } from './modules/whatsapp/pages/WhatsappPage';
 import { SettingsPage } from './modules/settings/pages/SettingsPage';
+import { UsersPage } from './modules/users/pages/UsersPage';
 import { LicensePage } from './modules/license/pages/LicensePage';
 import { LicenseRenewalBanner } from './modules/license/components/LicenseRenewalBanner';
 
@@ -96,6 +97,10 @@ export default function App() {
     return <LoginPage onLogin={setUser} />;
   }
 
+  const isAdmin = Number(user.roleId) === 1;
+  const withRole = (element: JSX.Element, adminOnly = false) =>
+    adminOnly && !isAdmin ? <Navigate to="/" replace /> : element;
+
   return (
     <>
       {licenseWarning && licenseDaysLeft > 0 && (
@@ -119,18 +124,19 @@ export default function App() {
           <Route path="/entregas" element={<DeliveriesPage />} />
           <Route path="/gastos" element={<ExpensesPage />} />
           <Route path="/garantias" element={<WarrantiesPage />} />
-          <Route path="/inventario" element={<InventoryPage />} />
-          <Route path="/reportes" element={<ReportsPage />} />
+          <Route path="/inventario" element={withRole(<InventoryPage />, true)} />
+          <Route path="/reportes" element={withRole(<ReportsPage />, true)} />
           <Route path="/whatsapp" element={<WhatsappPage />} />
-          <Route path="/configuracion" element={<SettingsPage user={user} />} />
+          <Route path="/configuracion" element={withRole(<SettingsPage user={user} />, true)} />
+          <Route path="/usuarios" element={withRole(<UsersPage />, true)} />
           <Route
             path="/auditoria"
-            element={
+            element={withRole(
               <PlaceholderPage
                 title="Auditoría"
                 subtitle="Preparado para exploración de logs y eventos."
               />
-            }
+            , true)}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@renderer/services/api';
-import { NavLink, Outlet } from 'react-router-dom';
-import type { SessionUser } from '@shared/types';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import type { GlobalSearchResult, SessionUser } from '@shared/types';
 
 const menu = [
   { to: '/', label: 'Inicio' },
@@ -18,6 +18,7 @@ const menu = [
   { to: '/reportes', label: 'Reportes' },
   { to: '/whatsapp', label: 'WhatsApp' },
   { to: '/configuracion', label: 'Configuración' },
+  { to: '/usuarios', label: 'Usuarios' },
   { to: '/auditoria', label: 'Auditoría' }
 ];
 
@@ -27,11 +28,60 @@ type AppShellProps = {
 };
 
 export const AppShell = ({ user, onLogout }: AppShellProps) => {
+  const navigate = useNavigate();
   const [now, setNow] = useState(() => new Date());
+  const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const isAdmin = Number(user.roleId) === 1;
+  const visibleMenu = useMemo(() => {
+    if (isAdmin) return menu;
+    const adminOnly = new Set([
+      '/inventario',
+      '/reportes',
+      '/configuracion',
+      '/auditoria',
+      '/usuarios'
+    ]);
+    return menu.filter((item) => !adminOnly.has(item.to));
+  }, [isAdmin]);
   const { data: company } = useQuery({
     queryKey: ['company-settings'],
     queryFn: api.companySettings
   });
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchText.trim());
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [searchText]);
+
+  const { data: globalSearch, isFetching: searchingGlobal } = useQuery<GlobalSearchResult>({
+    queryKey: ['global-search', debouncedSearch],
+    queryFn: async () => {
+      const term = debouncedSearch.trim();
+      if (!term) {
+        return { clients: [], orders: [], invoices: [] };
+      }
+      const [clients, orders, invoices] = await Promise.all([
+        api.searchClientsByName(term, 6),
+        api.searchOrders(term, 6),
+        api.searchInvoices(term, 6)
+      ]);
+      return { clients, orders, invoices };
+    },
+    enabled: debouncedSearch.length >= 2
+  });
+
+  const hasSearchResults = useMemo(() => {
+    return Boolean(
+      globalSearch &&
+        (globalSearch.clients.length > 0 ||
+          globalSearch.orders.length > 0 ||
+          globalSearch.invoices.length > 0)
+    );
+  }, [globalSearch]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -61,7 +111,7 @@ export const AppShell = ({ user, onLogout }: AppShellProps) => {
         </div>
 
         <nav className="sidebar-nav">
-          {menu.map((item) => (
+          {visibleMenu.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -89,14 +139,103 @@ export const AppShell = ({ user, onLogout }: AppShellProps) => {
       <div className="content-shell">
         <header className="topbar">
           <div>
-            <h1>Operación diaria</h1>
+            <h1>Inicio</h1>
           </div>
 
           <div className="topbar-tools">
-            <input
-              className="field compact-field"
-              placeholder="Buscar cliente, orden o factura"
-            />
+            <div className="topbar-search">
+              <input
+                className="field compact-field"
+                placeholder="Buscar cliente, orden o factura"
+                value={searchText}
+                onChange={(e) => {
+                  setSearchText(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setSearchOpen(false), 130);
+                }}
+              />
+
+              {searchOpen && debouncedSearch.length >= 2 ? (
+                <div className="topbar-search-results card-panel">
+                  {searchingGlobal ? (
+                    <p className="topbar-search-empty">Buscando...</p>
+                  ) : null}
+
+                  {!searchingGlobal && !hasSearchResults ? (
+                    <p className="topbar-search-empty">Sin resultados.</p>
+                  ) : null}
+
+                  {globalSearch?.clients?.length ? (
+                    <div className="topbar-search-group">
+                      <strong>Clientes</strong>
+                      {globalSearch.clients.map((client) => (
+                        <button
+                          key={`c-${client.id}`}
+                          type="button"
+                          className="topbar-search-item"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setSearchText('');
+                            navigate('/clientes');
+                          }}
+                        >
+                          <span>{client.firstName} {client.lastName}</span>
+                          <small>{client.phone}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {globalSearch?.orders?.length ? (
+                    <div className="topbar-search-group">
+                      <strong>Órdenes</strong>
+                      {globalSearch.orders.map((order) => (
+                        <button
+                          key={`o-${order.id}`}
+                          type="button"
+                          className="topbar-search-item"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setSearchText('');
+                            navigate(`/ordenes/${order.id}`);
+                          }}
+                        >
+                          <span>{order.orderNumber} · {order.clientName}</span>
+                          <small>{order.statusName} · Saldo {order.balanceDue.toLocaleString('es-CO')}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {globalSearch?.invoices?.length ? (
+                    <div className="topbar-search-group">
+                      <strong>Facturas</strong>
+                      {globalSearch.invoices.map((invoice) => (
+                        <button
+                          key={`i-${invoice.id}`}
+                          type="button"
+                          className="topbar-search-item"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setSearchText('');
+                            navigate(`/facturas/${invoice.orderId}`);
+                          }}
+                        >
+                          <span>{invoice.invoiceNumber} · {invoice.clientName}</span>
+                          <small>Orden #{invoice.orderId} · Saldo {invoice.balanceDue.toLocaleString('es-CO')}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
 
             <div className="topbar-user">
               <strong>{now.toLocaleDateString('es-CO')}</strong>

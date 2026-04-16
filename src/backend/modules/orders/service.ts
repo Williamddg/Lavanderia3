@@ -680,6 +680,48 @@ export const createOrdersService = (db: Kysely<Database>) => {
   };
 
   return {
+    async search(term: string, limit = 8): Promise<Order[]> {
+      const normalized = String(term ?? '').trim();
+      if (!normalized) return [];
+      const safeLimit = Math.max(1, Math.min(30, Number(limit) || 8));
+      const likeTerm = `%${normalized}%`;
+
+      const rows = await db
+        .selectFrom('orders as o')
+        .innerJoin('clients as c', 'c.id', 'o.client_id')
+        .innerJoin('order_statuses as s', 's.id', 'o.status_id')
+        .select([
+          'o.id',
+          'o.order_number',
+          'o.client_id',
+          'o.status_id',
+          'o.notes',
+          'o.discount_reason',
+          'o.subtotal',
+          'o.discount_total',
+          'o.total',
+          'o.paid_total',
+          'o.balance_due',
+          'o.due_date',
+          'o.created_at',
+          sql<string>`CONCAT(c.first_name, ' ', c.last_name)`.as('client_name'),
+          sql<string>`s.code`.as('status_code'),
+          sql<string>`s.name`.as('status_name'),
+          sql<string>`s.color`.as('status_color')
+        ])
+        .where((eb) =>
+          eb.or([
+            eb('o.order_number', 'like', likeTerm),
+            sql<boolean>`CONCAT(c.first_name, ' ', c.last_name) LIKE ${likeTerm}`
+          ])
+        )
+        .orderBy('o.id desc')
+        .limit(safeLimit)
+        .execute();
+
+      return rows.map(mapOrder);
+    },
+
     async dashboard(): Promise<DashboardSummary> {
       const [
         clients,
@@ -745,7 +787,10 @@ export const createOrdersService = (db: Kysely<Database>) => {
         pendingBalance: Number(pendingBalance?.sum ?? 0),
         openWarranties: Number(openWarranties?.count ?? 0),
         dailyExpenses: Number(dailyExpenses?.sum ?? 0),
-        recentOrders: recentOrders.slice(0, 5).map(mapOrder),
+        recentOrders: recentOrders
+          .sort((a, b) => Number(b.id) - Number(a.id))
+          .slice(0, 5)
+          .map(mapOrder),
         paymentBreakdown: paymentBreakdown.map((item) => ({
           methodName: item.method_name,
           amount: Number(item.amount ?? 0)

@@ -80,6 +80,10 @@ export const createExpensesService = (db: Kysely<Database>) => {
       .orderBy('id desc')
       .executeTakeFirst();
 
+    if (!activeCashSession) {
+      throw new Error('Debes abrir caja para registrar gastos y descontarlos del sistema.');
+    }
+
     const inserted = await db.transaction().execute(async (trx) => {
       const paymentMethod = await trx
         .selectFrom('payment_methods')
@@ -156,18 +160,16 @@ export const createExpensesService = (db: Kysely<Database>) => {
         })
         .executeTakeFirstOrThrow();
 
-      if (activeCashSession) {
-        await trx
-          .insertInto('cash_movements')
-          .values({
-            cash_session_id: activeCashSession.id,
-            movement_type: 'EXPENSE_OUT',
-            amount: parsed.amount,
-            notes: `Gasto (${paymentMethod.name}): ${parsed.description}`,
-            created_by: 1
-          })
-          .execute();
-      }
+      await trx
+        .insertInto('cash_movements')
+        .values({
+          cash_session_id: activeCashSession.id,
+          movement_type: 'EXPENSE_OUT',
+          amount: parsed.amount,
+          notes: `Gasto (${paymentMethod.name}): ${parsed.description}`,
+          created_by: 1
+        })
+        .execute();
 
       await trx
         .insertInto('audit_logs')
