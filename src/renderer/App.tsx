@@ -4,7 +4,6 @@ import type { HealthStatus, SessionUser } from '@shared/types';
 import { api } from './services/api';
 import { AppShell } from './ui/layouts/AppShell';
 import { SetupPage } from './modules/shared/components/SetupPage';
-import { PlaceholderPage } from './modules/shared/components/PlaceholderPage';
 import { LoginPage } from './modules/auth/pages/LoginPage';
 import { DashboardPage } from './modules/dashboard/pages/DashboardPage';
 import { ClientsPage } from './modules/clients/pages/ClientsPage';
@@ -23,6 +22,7 @@ import { ReportsPage } from './modules/reports/pages/ReportsPage';
 import { WhatsappPage } from './modules/whatsapp/pages/WhatsappPage';
 import { SettingsPage } from './modules/settings/pages/SettingsPage';
 import { UsersPage } from './modules/users/pages/UsersPage';
+import { AuditPage } from './modules/audit/pages/AuditPage';
 import { LicensePage } from './modules/license/pages/LicensePage';
 import { LicenseRenewalBanner } from './modules/license/components/LicenseRenewalBanner';
 
@@ -132,10 +132,7 @@ export default function App() {
           <Route
             path="/auditoria"
             element={withRole(
-              <PlaceholderPage
-                title="Auditoría"
-                subtitle="Preparado para exploración de logs y eventos."
-              />
+              <AuditPage />
             , true)}
           />
           <Route path="*" element={<Navigate to="/" replace />} />

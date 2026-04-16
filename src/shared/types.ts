@@ -222,6 +222,20 @@ export type PaymentInput = {
   notes?: string | null;
 };
 
+export type AuditEntry = {
+  id: number;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details: Record<string, any> | null;
+  createdAt: string;
+};
+
+export type AuditDay = {
+  date: string;
+  count: number;
+};
+
 export type PaymentLineInput = {
   paymentMethodId: number;
   amount: number;

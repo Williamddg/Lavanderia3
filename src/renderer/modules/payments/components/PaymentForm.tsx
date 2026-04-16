@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import type { BatchPaymentInput, CatalogsPayload, PaymentLineInput } from '@shared/types';
 import { Button, Input, Select } from '@renderer/ui/components';
 import { currency } from '@renderer/utils/format';
@@ -21,7 +20,7 @@ export const PaymentForm = ({
 }) => {
   const defaultMethodId = catalogs?.paymentMethods?.[0]?.id ?? 1;
 
-  const { register, control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
+  const { register, control, handleSubmit, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       lines: [{ paymentMethodId: defaultMethodId, amount: Number(balanceDue || 0), reference: null }]
     }
@@ -29,13 +28,10 @@ export const PaymentForm = ({
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
 
-  const lines = watch('lines');
+  // useWatch triggers re-render on every field change (unlike watch which may batch)
+  const lines = useWatch({ control, name: 'lines' }) ?? [];
 
-  const totalEntered = useMemo(
-    () => lines.reduce((s, l) => s + Number(l.amount || 0), 0),
-    [lines]
-  );
-
+  const totalEntered = lines.reduce((s, l) => s + Number(l.amount || 0), 0);
   const amountApplied = Math.min(totalEntered, Number(balanceDue || 0));
   const change = Math.max(0, totalEntered - Number(balanceDue || 0));
   const pendingAfter = Math.max(0, Number(balanceDue || 0) - amountApplied);

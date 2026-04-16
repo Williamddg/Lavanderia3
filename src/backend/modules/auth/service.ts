@@ -39,6 +39,18 @@ export const createAuthService = (db: Kysely<Database>) => ({
       : false;
 
     if (!user || !passwordMatches) {
+      // Log failed login attempt (best-effort, don't let this error propagate)
+      await db
+        .insertInto('audit_logs')
+        .values({
+          user_id: null,
+          action: 'LOGIN_FAILED',
+          entity_type: 'user',
+          entity_id: '0',
+          details_json: JSON.stringify({ username: parsed.username })
+        })
+        .execute()
+        .catch(() => {});
       throw new Error('Credenciales inválidas.');
     }
 

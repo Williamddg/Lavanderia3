@@ -129,6 +129,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
   createDelivery: (input: DeliveryInput) => ipcRenderer.invoke('deliveries:create', input),
 
   getDashboardSummary: () => ipcRenderer.invoke('dashboard:summary'),
+  auditListDays: () => ipcRenderer.invoke('audit:list-days'),
+  auditListByDay: (date: string) => ipcRenderer.invoke('audit:list-by-day', date),
 
   listServices: (activeOnly?: boolean) => ipcRenderer.invoke('services:list', activeOnly),
   createService: (input: ServiceInput) => ipcRenderer.invoke('services:create', input),

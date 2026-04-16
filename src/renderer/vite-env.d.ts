@@ -131,6 +131,8 @@ declare global {
       createDelivery: (input: DeliveryInput) => Promise<unknown>;
 
       getDashboardSummary: () => Promise<unknown>;
+      auditListDays: () => Promise<unknown>;
+      auditListByDay: (date: string) => Promise<unknown>;
     };
   }
 }

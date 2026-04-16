@@ -15,6 +15,7 @@ import { createExpensesService } from '../../backend/modules/expenses/service.js
 import { createWarrantiesService } from '../../backend/modules/warranties/service.js';
 import { createReportsService } from '../../backend/modules/reports/service.js';
 import { createUsersService } from '../../backend/modules/users/service.js';
+import { createAuditService } from '../../backend/modules/audit/service.js';
 import { printerService } from '../services/printer-service.js';
 import { backupService } from '../services/backup-service.js';
 import { licenseService } from '../services/license-service.js';
@@ -48,11 +49,16 @@ const wrap =
 
 export const registerIpc = () => {
   const ensurePrintableFrameReady = async (webContents: Electron.WebContents) => {
+    // Wait for fonts + 4 animation frames + fixed delay.
+    // On Mac, JsBarcode SVG useEffect may lag behind the first paint,
+    // so we need more time than on Windows.
     try {
       await webContents.executeJavaScript(
         `
           new Promise((resolve) => {
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+            let count = 0;
+            const tick = () => { if (++count >= 4) resolve(true); else requestAnimationFrame(tick); };
+            requestAnimationFrame(tick);
           })
         `,
         true
@@ -69,7 +75,8 @@ export const registerIpc = () => {
       // Ignorar errores de pre-render y continuar con printToPDF.
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    // 350ms fixed wait — enough for React useEffect renders (barcode, images) on Mac
+    await new Promise((resolve) => setTimeout(resolve, 350));
   };
 
   ipcMain.handle(
@@ -244,9 +251,12 @@ export const registerIpc = () => {
       }
 
       await ensurePrintableFrameReady(webContents);
+      // pageSize in microns (80mm × 500mm max). preferCSSPageSize overrides on
+      // most platforms; explicit size acts as a safe fallback for Mac Electron.
       const pdf = await webContents.printToPDF({
         printBackground: true,
-        preferCSSPageSize: true
+        preferCSSPageSize: true,
+        pageSize: { width: 80_000, height: 500_000 }
       });
 
       await writeFile(filePath, pdf);
@@ -280,7 +290,8 @@ export const registerIpc = () => {
         await ensurePrintableFrameReady(webContents);
         const pdf = await webContents.printToPDF({
           printBackground: true,
-          preferCSSPageSize: true
+          preferCSSPageSize: true,
+          pageSize: { width: 80_000, height: 500_000 }
         });
 
         await writeFile(outputPath, pdf);
@@ -577,5 +588,15 @@ export const registerIpc = () => {
   ipcMain.handle(
     'dashboard:summary',
     wrap(async () => createOrdersService(await databaseManager.getDb()).dashboard())
+  );
+
+  ipcMain.handle(
+    'audit:list-days',
+    wrap(async () => createAuditService(await databaseManager.getDb()).listDays())
+  );
+
+  ipcMain.handle(
+    'audit:list-by-day',
+    wrap(async (date: string) => createAuditService(await databaseManager.getDb()).listByDay(date))
   );
 };

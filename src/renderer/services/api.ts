@@ -1,4 +1,6 @@
 import type {
+  AuditDay,
+  AuditEntry,
   BatchPaymentInput,
   Expense,
   ExpenseInput,
@@ -186,6 +188,8 @@ export const api = {
     unwrap<{ success: true }>(window.desktopApi.deleteSellerUser(id)),
 
   dashboardSummary: () => unwrap<DashboardSummary>(window.desktopApi.getDashboardSummary()),
+  auditListDays: () => unwrap<AuditDay[]>(window.desktopApi.auditListDays()),
+  auditListByDay: (date: string) => unwrap<AuditEntry[]>(window.desktopApi.auditListByDay(date)),
 
   listServices: (activeOnly?: boolean) => unwrap<Service[]>(window.desktopApi.listServices(activeOnly)),
   createService: (input: ServiceInput) => unwrap<Service>(window.desktopApi.createService(input)),
