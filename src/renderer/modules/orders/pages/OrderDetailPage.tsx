@@ -19,16 +19,7 @@ import type { OrderStatus } from '@shared/types';
 
 const buildOrderDraftStorageKey = (orderId: number) => `lavasuite:order-edit-draft:${orderId}`;
 
-const STATUS_ORDER: Record<string, number> = {
-  CREATED: 10,
-  RECEIVED: 10,
-  IN_PROGRESS: 20,
-  READY: 30,
-  READY_FOR_DELIVERY: 40,
-  DELIVERED: 50,
-  WARRANTY: -1
-};
-const TERMINAL_CODES = new Set(['DELIVERED', 'CANCELLED', 'CANCELED']);
+const CANCELLED_CODES = new Set(['CANCELLED', 'CANCELED', 'CANCELADO']);
 
 const getValidNextStatuses = (
   currentCode: string,
@@ -36,28 +27,10 @@ const getValidNextStatuses = (
   statuses: OrderStatus[]
 ): OrderStatus[] => {
   const code = (currentCode ?? '').toUpperCase();
-
-  // Estado terminal: no hay transiciones
-  if (TERMINAL_CODES.has(code)) return [];
-
-  // Desde WARRANTY: solo listo para entregar, entregada, cancelada
-  if (code === 'WARRANTY') {
-    return statuses.filter((s) => {
-      const sc = s.code.toUpperCase();
-      return sc !== code && (sc === 'READY_FOR_DELIVERY' || TERMINAL_CODES.has(sc));
-    });
-  }
-
-  const currentLevel = STATUS_ORDER[code] ?? 0;
-
+  if (CANCELLED_CODES.has(code)) return [];
   return statuses.filter((s) => {
     const sc = s.code.toUpperCase();
-    if (sc === code || s.id === currentId) return false;
-    // Siempre permitir WARRANTY y CANCELLED desde estados no terminales
-    if (sc === 'WARRANTY' || TERMINAL_CODES.has(sc)) return true;
-    // Solo estados con nivel mayor al actual
-    const targetLevel = STATUS_ORDER[sc] ?? 0;
-    return targetLevel > currentLevel;
+    return sc !== code && s.id !== currentId;
   });
 };
 
@@ -173,8 +146,8 @@ export const OrderDetailPage = () => {
   const isCashOpen = Boolean(cashSummary?.activeSession);
 
   const paymentMutation = useMutation({
-    mutationFn: api.createPayment,
-    onSuccess: async (payment) => {
+    mutationFn: api.createPaymentBatch,
+    onSuccess: async (payments) => {
       setPaymentModal(false);
 
       await queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
@@ -183,19 +156,15 @@ export const OrderDetailPage = () => {
       await queryClient.invalidateQueries({ queryKey: ['cash-summary'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 
-      const methodCode = String(
-        catalogs?.paymentMethods?.find((method) => method.id === payment.paymentMethodId)?.code ?? ''
-      )
-        .trim()
-        .toLowerCase();
+      const hasCashLine = (payments ?? []).some((payment) => {
+        const methodCode = String(
+          catalogs?.paymentMethods?.find((method) => method.id === payment.paymentMethodId)?.code ?? ''
+        ).trim().toLowerCase();
+        const methodName = String(payment.paymentMethodName ?? '').trim().toLowerCase();
+        return methodCode === 'cash' || methodName === 'efectivo';
+      });
 
-      const methodName = String(payment.paymentMethodName ?? '')
-        .trim()
-        .toLowerCase();
-
-      const isCash = methodCode === 'cash' || methodName === 'efectivo';
-
-      if (isCash && isHardwareSupported) {
+      if (hasCashLine && isHardwareSupported) {
         try {
           await api.openCashDrawer();
         } catch (error) {
@@ -227,11 +196,7 @@ export const OrderDetailPage = () => {
       dueDate: data.dueDate,
       discountTotal: data.discountTotal ?? 0,
       discountReason: data.discountReason ?? null,
-
-      // 👇 ESTE CAMPO ES CLAVE
-      paidAmount: 0,
-      initialPaymentReason: null,
-
+      initialPaymentLines: [],
       items: data.items.map((item) => ({
         garmentTypeId: item.garmentTypeId,
         serviceId: item.serviceId,
@@ -530,6 +495,29 @@ export const OrderDetailPage = () => {
         );
 
       default:
+        const itemsDiscountTotal = data.items.reduce(
+          (sum, item) => sum + Number(item.discountAmount ?? 0),
+          0
+        );
+        const itemsSurchargeTotal = data.items.reduce(
+          (sum, item) => sum + Number(item.surchargeAmount ?? 0),
+          0
+        );
+        const discountReasons = Array.from(
+          new Set(
+            data.items
+              .map((item) => String(item.discountReason ?? '').trim())
+              .filter(Boolean)
+          )
+        );
+        const surchargeReasons = Array.from(
+          new Set(
+            data.items
+              .map((item) => String(item.surchargeReason ?? '').trim())
+              .filter(Boolean)
+          )
+        );
+
         return (
           <div className="detail-grid">
             <div className="card-panel stack-gap">
@@ -621,6 +609,30 @@ export const OrderDetailPage = () => {
                   <strong>{data.discountReason}</strong>
                 </div>
               ) : null}
+              {itemsDiscountTotal > 0 ? (
+                <div className="detail-row">
+                  <span>Descuentos por ítems</span>
+                  <strong>{currency(itemsDiscountTotal)}</strong>
+                </div>
+              ) : null}
+              {discountReasons.length > 0 ? (
+                <div className="detail-row">
+                  <span>Motivos descuento ítems</span>
+                  <strong>{discountReasons.join(' · ')}</strong>
+                </div>
+              ) : null}
+              {itemsSurchargeTotal > 0 ? (
+                <div className="detail-row">
+                  <span>Recargos por ítems</span>
+                  <strong>{currency(itemsSurchargeTotal)}</strong>
+                </div>
+              ) : null}
+              {surchargeReasons.length > 0 ? (
+                <div className="detail-row">
+                  <span>Motivos recargo ítems</span>
+                  <strong>{surchargeReasons.join(' · ')}</strong>
+                </div>
+              ) : null}
               <div className="detail-row">
                 <span>Total</span>
                 <strong>{currency(data.total)}</strong>
@@ -646,6 +658,9 @@ export const OrderDetailPage = () => {
 }, [data?.notes]);
 
   if (!data) return <section className="card-panel">Cargando detalle...</section>;
+  const currentStatusCode = String(data.statusCode ?? '').toUpperCase();
+  const isCanceledOrder = CANCELLED_CODES.has(currentStatusCode);
+  const isDeliveredOrder = currentStatusCode === 'DELIVERED';
 
   return (
     <section className="stack-gap">
@@ -686,6 +701,12 @@ export const OrderDetailPage = () => {
     <Button
       style={{ background: '#d97706', color: '#fff', border: 'none' }}
       onClick={() => requestProtectedAction('edit')}
+      disabled={isCanceledOrder || isDeliveredOrder}
+      title={
+        isCanceledOrder || isDeliveredOrder
+          ? 'No se puede editar una orden cancelada o entregada'
+          : undefined
+      }
     >
       Editar orden
     </Button>
@@ -693,6 +714,12 @@ export const OrderDetailPage = () => {
     <Button
       variant="danger"
       onClick={() => requestProtectedAction('cancel')}
+      disabled={isCanceledOrder || isDeliveredOrder}
+      title={
+        isCanceledOrder || isDeliveredOrder
+          ? 'No se puede cancelar una orden cancelada o entregada'
+          : undefined
+      }
     >
       Cancelar orden
     </Button>

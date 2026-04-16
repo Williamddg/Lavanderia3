@@ -1,8 +1,12 @@
 import { useMemo } from 'react';
-import { useForm } from 'react-hook-form';
-import type { CatalogsPayload, PaymentInput } from '@shared/types';
+import { useForm, useFieldArray } from 'react-hook-form';
+import type { BatchPaymentInput, CatalogsPayload, PaymentLineInput } from '@shared/types';
 import { Button, Input, Select } from '@renderer/ui/components';
 import { currency } from '@renderer/utils/format';
+
+type FormValues = {
+  lines: PaymentLineInput[];
+};
 
 export const PaymentForm = ({
   orderId,
@@ -13,107 +17,127 @@ export const PaymentForm = ({
   orderId: number;
   catalogs?: CatalogsPayload;
   balanceDue: number;
-  onSubmit: (value: PaymentInput) => void;
+  onSubmit: (value: BatchPaymentInput) => void;
 }) => {
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors }
-  } = useForm<PaymentInput>({
+  const defaultMethodId = catalogs?.paymentMethods?.[0]?.id ?? 1;
+
+  const { register, control, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
-      orderId,
-      paymentMethodId: catalogs?.paymentMethods?.[0]?.id ?? 1,
-      amount: Number(balanceDue || 0),
-      reference: null
+      lines: [{ paymentMethodId: defaultMethodId, amount: Number(balanceDue || 0), reference: null }]
     }
   });
 
-  const receivedAmount = Number(watch('amount') || 0);
-  const realPayment = Math.min(receivedAmount, Number(balanceDue || 0));
-  const change = Math.max(0, receivedAmount - Number(balanceDue || 0));
-  const pendingAfterPayment = Math.max(0, Number(balanceDue || 0) - receivedAmount);
+  const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
+
+  const lines = watch('lines');
+
+  const totalEntered = useMemo(
+    () => lines.reduce((s, l) => s + Number(l.amount || 0), 0),
+    [lines]
+  );
+
+  const amountApplied = Math.min(totalEntered, Number(balanceDue || 0));
+  const change = Math.max(0, totalEntered - Number(balanceDue || 0));
+  const pendingAfter = Math.max(0, Number(balanceDue || 0) - amountApplied);
 
   return (
     <form
       className="stack-gap"
       onSubmit={handleSubmit((values) => {
-        const amount = Number(values.amount || 0);
-
-        if (amount <= 0) {
-          return;
-        }
+        const validLines = values.lines.filter((l) => Number(l.amount || 0) > 0);
+        if (validLines.length === 0) return;
 
         onSubmit({
           orderId,
-          paymentMethodId: Number(values.paymentMethodId),
-          amount: Math.min(amount, Number(balanceDue || 0)),
-          reference: values.reference || null
+          lines: validLines.map((l) => ({
+            paymentMethodId: Number(l.paymentMethodId),
+            amount: Number(l.amount),
+            reference: l.reference || null
+          }))
         });
       })}
     >
-      <label>
-        <span>Método de pago</span>
-        <Select
-          {...register('paymentMethodId', {
-            valueAsNumber: true,
-            required: 'Selecciona un método de pago'
-          })}
+      <div className="stack-gap">
+        {fields.map((field, index) => (
+          <div key={field.id} className="card-panel" style={{ padding: '12px 16px' }}>
+            <div className="form-grid">
+              <label>
+                <span>Método de pago</span>
+                <Select
+                  {...register(`lines.${index}.paymentMethodId`, { valueAsNumber: true })}
+                >
+                  {catalogs?.paymentMethods.map((method) => (
+                    <option key={method.id} value={method.id}>
+                      {method.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+
+              <label>
+                <span>Valor</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  {...register(`lines.${index}.amount`, {
+                    valueAsNumber: true,
+                    required: 'Ingresa un valor',
+                    min: { value: 0.01, message: 'Debe ser mayor a 0' }
+                  })}
+                />
+                {errors.lines?.[index]?.amount && (
+                  <small className="error-text">{errors.lines[index]?.amount?.message}</small>
+                )}
+              </label>
+
+              <label>
+                <span>Referencia</span>
+                <Input {...register(`lines.${index}.reference`)} placeholder="Opcional" />
+              </label>
+
+              {fields.length > 1 && (
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <Button type="button" variant="danger" onClick={() => remove(index)}>
+                    Quitar
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() =>
+            append({ paymentMethodId: defaultMethodId, amount: 0, reference: null })
+          }
         >
-          {catalogs?.paymentMethods.map((method) => (
-            <option key={method.id} value={method.id}>
-              {method.name}
-            </option>
-          ))}
-        </Select>
-        {errors.paymentMethodId && (
-          <small className="error-text">{errors.paymentMethodId.message}</small>
-        )}
-      </label>
-
-      <label>
-        <span>Valor recibido</span>
-        <Input
-          type="number"
-          step="0.01"
-          {...register('amount', {
-            valueAsNumber: true,
-            required: 'Ingresa un valor',
-            min: {
-              value: 0.01,
-              message: 'El valor debe ser mayor a 0'
-            }
-          })}
-        />
-        {errors.amount && (
-          <small className="error-text">{errors.amount.message}</small>
-        )}
-      </label>
-
-      <label>
-        <span>Referencia</span>
-        <Input {...register('reference')} />
-      </label>
+          + Agregar método de pago
+        </Button>
+      </div>
 
       <div className="card-panel stack-gap" style={{ background: '#f8fafc' }}>
         <div className="detail-row">
           <span>Saldo pendiente</span>
           <strong>{currency(Number(balanceDue || 0))}</strong>
         </div>
-
+        <div className="detail-row">
+          <span>Total ingresado</span>
+          <strong>{currency(totalEntered)}</strong>
+        </div>
         <div className="detail-row">
           <span>Se aplicará al pago</span>
-          <strong>{currency(realPayment)}</strong>
+          <strong>{currency(amountApplied)}</strong>
         </div>
-
         <div className="detail-row">
           <span>Cambio a devolver</span>
           <strong>{currency(change)}</strong>
         </div>
-
         <div className="detail-row">
           <span>Saldo después del pago</span>
-          <strong>{currency(pendingAfterPayment)}</strong>
+          <strong>{currency(pendingAfter)}</strong>
         </div>
       </div>
 

@@ -72,7 +72,8 @@ const STATUS_SORT_PRIORITY: Record<string, number> = {
   CREATED: 6,
   DELIVERED: 90,
   CANCELLED: 95,
-  CANCELED: 95
+  CANCELED: 95,
+  CANCELADO: 95
 };
 
 /** Fallback por nombre de estado si aún no hay statusCode en cache */
@@ -89,11 +90,7 @@ const getPriorityByName = (name: string): number => {
   return 50;
 };
 
-const STATUS_ORDER_LEVEL: Record<string, number> = {
-  CREATED: 10, RECEIVED: 10, IN_PROGRESS: 20, READY: 30,
-  READY_FOR_DELIVERY: 40, DELIVERED: 50, WARRANTY: -1
-};
-const TERMINAL = new Set(['DELIVERED', 'CANCELLED', 'CANCELED']);
+const TERMINAL = new Set(['CANCELLED', 'CANCELED', 'CANCELADO']);
 
 const validNextStatuses = (
   currentCode: string,
@@ -102,18 +99,10 @@ const validNextStatuses = (
 ) => {
   const code = (currentCode ?? '').toUpperCase();
   if (TERMINAL.has(code)) return [];
-  if (code === 'WARRANTY') {
-    return statuses.filter((s) => {
-      const sc = s.code.toUpperCase();
-      return sc !== code && (sc === 'READY_FOR_DELIVERY' || TERMINAL.has(sc));
-    });
-  }
-  const level = STATUS_ORDER_LEVEL[code] ?? 0;
   return statuses.filter((s) => {
     const sc = s.code.toUpperCase();
     if (sc === code || s.id === currentId) return false;
-    if (sc === 'WARRANTY' || TERMINAL.has(sc)) return true;
-    return (STATUS_ORDER_LEVEL[sc] ?? 0) > level;
+    return true;
   });
 };
 

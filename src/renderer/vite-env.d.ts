@@ -2,6 +2,7 @@
 
 import type {
   ApiResponse,
+  BatchPaymentInput,
   ClientInput,
   DeliveryInput,
   ExternalLinkPayload,
@@ -92,6 +93,7 @@ declare global {
 
       listPayments: (orderId?: number) => Promise<unknown>;
       createPayment: (input: PaymentInput) => Promise<unknown>;
+      createPaymentBatch: (input: BatchPaymentInput) => Promise<unknown>;
 
       listInvoices: () => Promise<unknown>;
       getInvoiceDetail: (id: number) => Promise<unknown>;

@@ -13,20 +13,7 @@ import { createPaymentsService } from '../payments/service.js';
 import { createInvoicesService } from '../invoices/service.js';
 import { createDeliveriesService } from '../deliveries/service.js';
 
-// Status transition rules: order → priority level (higher = further along)
-const STATUS_ORDER: Record<string, number> = {
-  CREATED: 10,
-  RECEIVED: 10,
-  IN_PROGRESS: 20,
-  READY: 30,
-  READY_FOR_DELIVERY: 40,
-  DELIVERED: 50,
-  CANCELLED: 60,
-  CANCELED: 60,
-  WARRANTY: -1 // special state, handled separately
-};
-
-const TERMINAL_STATES = new Set(['DELIVERED', 'CANCELLED', 'CANCELED']);
+const TERMINAL_STATES = new Set(['CANCELLED', 'CANCELED', 'CANCELADO']);
 
 const orderItemSchema = z.object({
   garmentTypeId: z.number().nullable(),
@@ -53,16 +40,19 @@ const orderItemSchema = z.object({
   total: z.number().nonnegative()
 });
 
+const paymentLineSchema = z.object({
+  paymentMethodId: z.number().positive(),
+  amount: z.number().positive(),
+  reference: z.string().nullable()
+});
+
 const orderSchema = z.object({
   clientId: z.number().positive(),
   notes: z.string().nullable(),
   dueDate: z.string().nullable(),
   discountTotal: z.number().nonnegative(),
   discountReason: z.string().nullable().optional(),
-  paidAmount: z.number().nonnegative(),
-  initialPaymentMethodId: z.number().nullable().optional(),
-  initialPaymentReference: z.string().nullable().optional(),
-  initialPaymentReason: z.string().nullable().optional(),
+  initialPaymentLines: z.array(paymentLineSchema).default([]),
   items: z.array(orderItemSchema).min(1)
 });
 
@@ -197,11 +187,11 @@ export const createOrdersService = (db: Kysely<Database>) => {
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
     const itemsTotal = normalizedItems.reduce((sum, item) => sum + item.total, 0);
     const total = Math.max(0, itemsTotal - parsed.discountTotal);
-    const paidTotal = Math.min(parsed.paidAmount, total);
-
-    if (paidTotal > 0 && !parsed.initialPaymentMethodId) {
-      throw new Error('Debes seleccionar el método de pago del abono inicial.');
-    }
+    const initialLines = (parsed.initialPaymentLines ?? []).filter((l) => l.amount > 0);
+    const paidTotal = Math.min(
+      initialLines.reduce((s, l) => s + l.amount, 0),
+      total
+    );
 
     let orderId = 0;
 
@@ -298,13 +288,11 @@ export const createOrdersService = (db: Kysely<Database>) => {
         .execute();
     });
 
-    if (paidTotal > 0) {
-      await paymentsService.create({
+    if (paidTotal > 0 && initialLines.length > 0) {
+      await paymentsService.createBatch({
         orderId,
-        paymentMethodId: parsed.initialPaymentMethodId as number,
-        amount: paidTotal,
-        reference: parsed.initialPaymentReference || 'Abono inicial',
-        notes: parsed.initialPaymentReason || null
+        lines: initialLines,
+        notes: 'Abono inicial'
       });
     }
 
@@ -438,6 +426,21 @@ export const createOrdersService = (db: Kysely<Database>) => {
       throw new Error('Orden no encontrada.');
     }
 
+    const currentStatus = await db
+      .selectFrom('order_statuses')
+      .select(['code', 'name'])
+      .where('id', '=', order.status_id)
+      .executeTakeFirst();
+
+    const currentCode = String(currentStatus?.code ?? '').toUpperCase();
+    if (currentCode === 'CANCELLED' || currentCode === 'CANCELED' || currentCode === 'CANCELADO') {
+      throw new Error('La orden ya está cancelada.');
+    }
+
+    if (currentCode === 'DELIVERED' || currentCode === 'ENTREGADO') {
+      throw new Error('No puedes cancelar una orden ya entregada.');
+    }
+
     const deliveriesCount = await db
       .selectFrom('delivery_records')
       .select((eb) => eb.fn.count<number>('id').as('count'))
@@ -459,11 +462,42 @@ export const createOrdersService = (db: Kysely<Database>) => {
       throw new Error('No existe un estado de cancelación configurado.');
     }
 
+    // Get all payments to refund
+    const orderPayments = await db
+      .selectFrom('payments as p')
+      .innerJoin('payment_methods as pm', 'pm.id', 'p.payment_method_id')
+      .select([
+        'p.id',
+        'p.amount',
+        sql<string>`pm.name`.as('payment_method_name')
+      ])
+      .where('p.order_id', '=', orderId)
+      .execute();
+
+    const totalPaid = orderPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+    // Get active cash session for refund movements
+    const activeCashSession = totalPaid > 0
+      ? await db
+          .selectFrom('cash_sessions')
+          .select('id')
+          .where('status', '=', 'open')
+          .executeTakeFirst()
+      : null;
+
+    if (totalPaid > 0 && !activeCashSession) {
+      throw new Error(
+        'La orden tiene pagos registrados y la caja está cerrada. Abre caja para registrar la devolución.'
+      );
+    }
+
     await db.transaction().execute(async (trx) => {
       await trx
         .updateTable('orders')
         .set({
-          status_id: cancelStatus.id
+          status_id: cancelStatus.id,
+          paid_total: 0,
+          balance_due: 0
         })
         .where('id', '=', orderId)
         .execute();
@@ -486,6 +520,22 @@ export const createOrdersService = (db: Kysely<Database>) => {
         })
         .execute();
 
+      // Create PAYMENT_OUT movements for each payment refunded
+      if (activeCashSession && orderPayments.length > 0) {
+        for (const payment of orderPayments) {
+          await trx
+            .insertInto('cash_movements')
+            .values({
+              cash_session_id: activeCashSession.id,
+              movement_type: 'PAYMENT_OUT',
+              amount: Number(payment.amount),
+              notes: `Devolución orden #${orderId} · ${payment.payment_method_name}`,
+              created_by: 1
+            })
+            .execute();
+        }
+      }
+
       await trx
         .insertInto('audit_logs')
         .values({
@@ -495,7 +545,9 @@ export const createOrdersService = (db: Kysely<Database>) => {
           details_json: JSON.stringify({
             orderId,
             statusId: cancelStatus.id,
-            statusName: cancelStatus.name
+            statusName: cancelStatus.name,
+            refundedTotal: totalPaid,
+            cashSessionId: activeCashSession?.id ?? null
           })
         })
         .execute();
@@ -537,30 +589,9 @@ export const createOrdersService = (db: Kysely<Database>) => {
       throw new Error('La orden ya está en ese estado.');
     }
 
-    // Estados terminales no pueden cambiar
+    // Una orden cancelada no puede cambiar nunca más
     if (TERMINAL_STATES.has(currentCode)) {
       throw new Error(`La orden ya está en un estado final (${order.current_name}) y no puede cambiar.`);
-    }
-
-    // Desde EN GARANTÍA solo se puede ir a Listo para entregar, Entregada o Cancelada
-    if (currentCode === 'WARRANTY') {
-      const warrantyAllowed = new Set(['READY_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'CANCELED']);
-      if (!warrantyAllowed.has(targetCode)) {
-        throw new Error('Desde "En garantía" solo puedes pasar a "Listo para entregar", "Entregada" o "Cancelada".');
-      }
-    } else {
-      // Para estados normales: no permitir retroceder
-      const currentLevel = STATUS_ORDER[currentCode] ?? 0;
-      const targetLevel = STATUS_ORDER[targetCode] ?? 0;
-
-      // WARRANTY y CANCELLED/CANCELED siempre se permiten desde estados no-terminales
-      const isSpecialTarget = targetCode === 'WARRANTY' || TERMINAL_STATES.has(targetCode);
-
-      if (!isSpecialTarget && targetLevel <= currentLevel) {
-        throw new Error(
-          `No puedes regresar de "${order.current_name}" a "${status.name}". Los estados solo avanzan hacia adelante.`
-        );
-      }
     }
 
     await db.transaction().execute(async (trx) => {

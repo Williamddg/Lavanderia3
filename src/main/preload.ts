@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
+  BatchPaymentInput,
   ClientInput,
   DeliveryInput,
   ExternalLinkPayload,
@@ -87,6 +88,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
 
   listPayments: (orderId?: number) => ipcRenderer.invoke('payments:list', orderId),
   createPayment: (input: PaymentInput) => ipcRenderer.invoke('payments:create', input),
+  createPaymentBatch: (input: BatchPaymentInput) => ipcRenderer.invoke('payments:create-batch', input),
 
   listInvoices: () => ipcRenderer.invoke('invoices:list'),
   getInvoiceDetail: (id: number) => ipcRenderer.invoke('invoices:detail', id),

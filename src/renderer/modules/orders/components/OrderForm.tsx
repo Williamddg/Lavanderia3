@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import type { CatalogsPayload, Client, OrderDetail, OrderInput } from '@shared/types';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import type { CatalogsPayload, Client, OrderDetail, OrderInput, PaymentLineInput } from '@shared/types';
 import { Button, FormSection, Input, Select, Textarea } from '@renderer/ui/components';
 import { currency } from '@renderer/utils/format';
 
@@ -13,10 +13,7 @@ const defaultValues: OrderInput = {
   dueDate: null,
   discountTotal: 0,
   discountReason: null,
-  paidAmount: 0,
-  initialPaymentMethodId: null,
-  initialPaymentReference: null,
-  initialPaymentReason: null,
+  initialPaymentLines: [],
   items: [
     {
       garmentTypeId: null,
@@ -44,6 +41,12 @@ const defaultValues: OrderInput = {
     }
   ]
 };
+
+const emptyPaymentLine = (methodId: number): PaymentLineInput => ({
+  paymentMethodId: methodId,
+  amount: 0,
+  reference: null
+});
 
 /** Computes per-item subtotal and total from base fields (never stale). */
 const computeItemTotals = (item: OrderInput['items'][number]) => {
@@ -88,10 +91,18 @@ export const OrderForm = ({
     formState: { errors }
   } = useForm<OrderInput>({ defaultValues });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields: itemFields, append: appendItem, remove: removeItem, replace } = useFieldArray({
     control,
     name: 'items'
   });
+
+  const defaultMethodId = catalogs?.paymentMethods?.[0]?.id ?? 1;
+
+  const {
+    fields: paymentFields,
+    append: appendPayment,
+    remove: removePayment
+  } = useFieldArray({ control, name: 'initialPaymentLines' });
 
   const [serviceSearch, setServiceSearch] = useState<Record<number, string>>({});
   const skipNextDraftSyncRef = useRef(Boolean(initialDraft && !initialValue));
@@ -112,10 +123,7 @@ export const OrderForm = ({
         dueDate: initialValue.dueDate ? initialValue.dueDate.slice(0, 10) : null,
         discountTotal: Number(initialValue.discountTotal || 0),
         discountReason: initialValue.discountReason || null,
-        paidAmount: 0,
-        initialPaymentMethodId: null,
-        initialPaymentReference: null,
-        initialPaymentReason: null,
+        initialPaymentLines: [],
         items: initialValue.items.map((item) => ({
           garmentTypeId: item.garmentTypeId,
           serviceId: item.serviceId,
@@ -189,11 +197,11 @@ export const OrderForm = ({
           notes: current.notes || null,
           dueDate: current.dueDate || null,
           discountTotal: Number(current.discountTotal || 0),
-          paidAmount: Number(current.paidAmount || 0),
-          initialPaymentMethodId: current.initialPaymentMethodId
-            ? Number(current.initialPaymentMethodId)
-            : null,
-          initialPaymentReference: current.initialPaymentReference || null,
+          initialPaymentLines: (current.initialPaymentLines ?? []).map((l) => ({
+            paymentMethodId: Number(l.paymentMethodId),
+            amount: Number(l.amount || 0),
+            reference: l.reference || null
+          })),
           items: (current.items?.length ? current.items : defaultValues.items).map((item) => {
             const { itemSubtotal, itemTotal } = computeItemTotals(item);
             return {
@@ -229,12 +237,18 @@ export const OrderForm = ({
     };
   }, [getValues, initialValue, onDraftChange, watch]);
 
-  const items = watch('items');
-  const discountTotal = Number(watch('discountTotal') || 0);
-  const paidAmount = Number(watch('paidAmount') || 0);
+  const watchedItems = useWatch({ control, name: 'items' }) ?? [];
+  const watchedDiscountTotal = useWatch({ control, name: 'discountTotal' });
+  const watchedInitialPaymentLines = useWatch({ control, name: 'initialPaymentLines' }) ?? [];
+  const discountTotal = Number(watchedDiscountTotal || 0);
+  const initialPaymentLines = watchedInitialPaymentLines;
+  const paidAmount = useMemo(
+    () => initialPaymentLines.reduce((s, l) => s + Number(l.amount || 0), 0),
+    [initialPaymentLines]
+  );
 
   // Always-accurate totals computed directly from base fields — no stale state
-  const computedItems = useMemo(() => items.map(computeItemTotals), [items]);
+  const computedItems = useMemo(() => watchedItems.map(computeItemTotals), [watchedItems]);
 
   const subtotal = useMemo(
     () => computedItems.reduce((s, c) => s + c.itemSubtotal, 0),
@@ -264,31 +278,22 @@ export const OrderForm = ({
     <form
       className="stack-gap"
       onSubmit={handleSubmit((values) => {
-        if (!hideInitialPaymentFields && values.paidAmount > 0 && !values.initialPaymentMethodId) {
-          alert('Debes seleccionar el método de pago del abono');
-          return;
-        }
-
         onSubmit({
           ...values,
           dueDate: values.dueDate || null,
           notes: values.notes || null,
           discountTotal: Math.max(0, Math.trunc(Number(values.discountTotal || 0))),
           discountReason: values.discountReason || null,
-          paidAmount: Number(values.paidAmount || 0),
-          initialPaymentMethodId:
-            !hideInitialPaymentFields && values.paidAmount > 0
-              ? Number(values.initialPaymentMethodId)
-              : null,
-          initialPaymentReference:
-            !hideInitialPaymentFields && values.paidAmount > 0
-              ? values.initialPaymentReference || null
-              : null,
-          initialPaymentReason:
-            !hideInitialPaymentFields && values.paidAmount > 0
-              ? values.initialPaymentReason || null
-              : null,
-          items: values.items.map((item, idx) => {
+          initialPaymentLines: hideInitialPaymentFields
+            ? []
+            : (values.initialPaymentLines ?? [])
+                .filter((l) => Number(l.amount || 0) > 0)
+                .map((l) => ({
+                  paymentMethodId: Number(l.paymentMethodId),
+                  amount: Number(l.amount),
+                  reference: l.reference || null
+                })),
+          items: values.items.map((item) => {
             const { itemSubtotal, itemTotal } = computeItemTotals(item);
             return {
               ...item,
@@ -356,7 +361,7 @@ export const OrderForm = ({
 
       <FormSection title="Prendas / ítems">
         <div className="stack-gap">
-          {fields.map((field, index) => {
+          {itemFields.map((field, index) => {
             const { itemSubtotal, itemTotal } = computedItems[index] ?? { itemSubtotal: 0, itemTotal: 0 };
 
             return (
@@ -397,7 +402,7 @@ export const OrderForm = ({
                             Number(selectedService.basePrice ?? 0)
                           );
 
-                          const currentDescription = watch(`items.${index}.description`);
+                          const currentDescription = getValues(`items.${index}.description`);
                           if (!currentDescription || !currentDescription.trim()) {
                             setValue(`items.${index}.description`, selectedService.name);
                           }
@@ -448,7 +453,7 @@ export const OrderForm = ({
                       type="number"
                       step="0.01"
                       min="0"
-                      disabled={Boolean(watch(`items.${index}.serviceId` as const))}
+                      disabled={Boolean(watchedItems[index]?.serviceId)}
                       {...register(`items.${index}.unitPrice` as const, {
                         valueAsNumber: true
                       })}
@@ -520,11 +525,11 @@ export const OrderForm = ({
                   </div>
                 </div>
 
-                {fields.length > 1 && (
+                {itemFields.length > 1 && (
                   <Button
                     type="button"
                     variant="danger"
-                    onClick={() => remove(index)}
+                    onClick={() => removeItem(index)}
                   >
                     Quitar ítem
                   </Button>
@@ -555,7 +560,7 @@ export const OrderForm = ({
               e.currentTarget.style.boxShadow = '0 6px 18px rgba(37, 99, 235, 0.35)';
             }}
             onClick={() =>
-              append({
+              appendItem({
                 garmentTypeId: null,
                 serviceId: null,
                 description: '',
@@ -621,49 +626,90 @@ export const OrderForm = ({
             <span>Razón del descuento</span>
             <Input {...register('discountReason')} placeholder="Ej: cortesía, cliente frecuente..." />
           </label>
-
-          <label>
-            <span>Abono inicial</span>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              {...register('paidAmount', { valueAsNumber: true })}
-              disabled={hideInitialPaymentFields}
-            />
-          </label>
-
-          {!hideInitialPaymentFields && paidAmount > 0 && (
-            <>
-              <label>
-                <span>Método de pago</span>
-                <Select
-                  {...register('initialPaymentMethodId', { valueAsNumber: true })}
-                >
-                  <option value="">Seleccionar</option>
-                  {catalogs?.paymentMethods.map((method) => (
-                    <option key={method.id} value={method.id}>
-                      {method.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-
-              <label>
-                <span>Referencia</span>
-                <Input {...register('initialPaymentReference')} />
-              </label>
-
-              <label className="full-span">
-                <span>Razón del abono</span>
-                <Input
-                  {...register('initialPaymentReason')}
-                  placeholder="Ej: separa trabajo, abono parcial acordado..."
-                />
-              </label>
-            </>
-          )}
         </div>
+
+        {!hideInitialPaymentFields && (
+          <div className="stack-gap" style={{ marginTop: 12 }}>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>
+              Abono inicial{' '}
+              <span style={{ fontWeight: 400, color: '#6b7280', fontSize: 13 }}>
+                (opcional — puedes agregar varios métodos de pago)
+              </span>
+            </p>
+
+            {paymentFields.map((field, index) => (
+              <div key={field.id} className="card-panel" style={{ padding: '12px 16px' }}>
+                <div className="form-grid">
+                  <label>
+                    <span>Método de pago</span>
+                    <Select
+                      {...register(`initialPaymentLines.${index}.paymentMethodId`, { valueAsNumber: true })}
+                    >
+                      {catalogs?.paymentMethods.map((method) => (
+                        <option key={method.id} value={method.id}>
+                          {method.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+
+                  <label>
+                    <span>Valor</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register(`initialPaymentLines.${index}.amount`, { valueAsNumber: true })}
+                    />
+                  </label>
+
+                  <label>
+                    <span>Referencia</span>
+                    <Input
+                      {...register(`initialPaymentLines.${index}.reference`)}
+                      placeholder="Opcional"
+                    />
+                  </label>
+
+                  {paymentFields.length > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                      <Button type="button" variant="danger" onClick={() => removePayment(index)}>
+                        Quitar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => appendPayment(emptyPaymentLine(defaultMethodId))}
+              >
+                + Agregar método de pago
+              </Button>
+
+              {paymentFields.length > 0 && (
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => {
+                    for (let i = paymentFields.length - 1; i >= 0; i--) removePayment(i);
+                  }}
+                >
+                  Quitar abono
+                </Button>
+              )}
+            </div>
+
+            <div style={{ fontSize: 13, color: '#374151' }}>
+              Total abono: <strong>{currency(paidAmount)}</strong>
+              {' · '}Saldo tras abono: <strong>{currency(Math.max(0, total - paidAmount))}</strong>
+            </div>
+          </div>
+        )}
       </FormSection>
 
       <div className="form-actions">

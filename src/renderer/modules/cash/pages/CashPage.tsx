@@ -482,8 +482,7 @@ export const CashPage = () => {
       0
     );
 
-  const systemAmount =
-    Number(data?.activeSession?.openingAmount ?? 0) + totalSessionSales;
+  const systemAmount = Number(data?.systemAmount ?? 0);
 
   const closurePreview = useMemo(
     () => lastClosedPreview ?? closeMutation.data ?? null,

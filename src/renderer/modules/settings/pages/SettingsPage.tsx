@@ -1,33 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { SessionUser } from '@shared/types';
 import { api } from '@renderer/services/api';
 import { Button, DataTable, Input, PageHeader } from '@renderer/ui/components';
 
-export const SettingsPage = () => {
+export const SettingsPage = ({ user }: { user: SessionUser }) => {
+  const [unlocked, setUnlocked] = useState(false);
+  const [pwInput, setPwInput] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
   const queryClient = useQueryClient();
+  const [form, setForm] = useState<any>({});
+  const [currentAdminPassword, setCurrentAdminPassword] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
 
   const { data, refetch } = useQuery({
     queryKey: ['company-settings'],
-    queryFn: api.companySettings
+    queryFn: api.companySettings,
+    enabled: unlocked
   });
 
   const { data: backups = [] } = useQuery({
     queryKey: ['backups'],
-    queryFn: api.listBackups
+    queryFn: api.listBackups,
+    enabled: unlocked
   });
 
- 
-
-  const [form, setForm] = useState<any>({});
-  const [currentAdminPassword, setCurrentAdminPassword] = useState('');
-const [newAdminPassword, setNewAdminPassword] = useState('');
-const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
-
   useEffect(() => {
-    if (data) setForm(data);
-  }, [data]);
-
-
+    if (unlocked && data) setForm(data);
+  }, [unlocked, data]);
 
   const connectDriveMutation = useMutation({
     mutationFn: api.connectDriveBackup
@@ -41,15 +43,57 @@ const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
   });
 
   const updateAdminPasswordMutation = useMutation({
-  mutationFn: api.updateOrderProtectionPassword,
-  onSuccess: async () => {
-    await queryClient.invalidateQueries({ queryKey: ['order-protection-password'] });
+    mutationFn: api.updateOrderProtectionPassword,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['order-protection-password'] });
 
-    setCurrentAdminPassword('');
-    setNewAdminPassword('');
-    setConfirmAdminPassword('');
+      setCurrentAdminPassword('');
+      setNewAdminPassword('');
+      setConfirmAdminPassword('');
+    }
+  });
+
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    setPwLoading(true);
+    try {
+      await api.login({ username: user.username, password: pwInput });
+      setUnlocked(true);
+    } catch {
+      setPwError('Contraseña incorrecta. Intenta de nuevo.');
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  if (!unlocked) {
+    return (
+      <section className="stack-gap">
+        <PageHeader title="Configuración" subtitle="Se requiere tu contraseña para continuar." />
+        <div className="card-panel" style={{ maxWidth: 400 }}>
+          <form className="stack-gap" onSubmit={handleUnlock}>
+            <label>
+              <span>Contraseña</span>
+              <Input
+                type="password"
+                value={pwInput}
+                onChange={(e) => setPwInput(e.target.value)}
+                placeholder="Ingresa tu contraseña de sesión"
+                autoFocus
+              />
+            </label>
+            {pwError && <p className="error-text">{pwError}</p>}
+            <div className="form-actions">
+              <Button type="submit" disabled={pwLoading || !pwInput.trim()}>
+                {pwLoading ? 'Verificando...' : 'Confirmar y continuar'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </section>
+    );
   }
-});
 
   const handleSave = async () => {
     await api.updateCompanySettings(form);

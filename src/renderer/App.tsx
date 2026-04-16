@@ -122,7 +122,7 @@ export default function App() {
           <Route path="/inventario" element={<InventoryPage />} />
           <Route path="/reportes" element={<ReportsPage />} />
           <Route path="/whatsapp" element={<WhatsappPage />} />
-          <Route path="/configuracion" element={<SettingsPage />} />
+          <Route path="/configuracion" element={<SettingsPage user={user} />} />
           <Route
             path="/auditoria"
             element={

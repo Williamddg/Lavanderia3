@@ -18,6 +18,7 @@ import { licenseService } from '../services/license-service.js';
 import { initialSetupService } from '../services/initial-setup-service.js';
 
 import type {
+  BatchPaymentInput,
   ClientInput,
   DeliveryInput,
   ExternalLinkPayload,
@@ -320,6 +321,13 @@ export const registerIpc = () => {
     'payments:create',
     wrap(async (input: PaymentInput) =>
       createPaymentsService(await databaseManager.getDb()).create(input)
+    )
+  );
+
+  ipcMain.handle(
+    'payments:create-batch',
+    wrap(async (input: BatchPaymentInput) =>
+      createPaymentsService(await databaseManager.getDb()).createBatch(input)
     )
   );
 

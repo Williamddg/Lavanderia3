@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
-import type { Payment, PaymentInput } from '../../../shared/types.js';
+import type { BatchPaymentInput, Payment, PaymentInput } from '../../../shared/types.js';
 
 const schema = z.object({
   orderId: z.number().positive(),
@@ -211,5 +211,132 @@ export const createPaymentsService = (db: Kysely<Database>) => {
     ) as Payment;
   };
 
-  return { list, create };
+  const createBatch = async (input: BatchPaymentInput): Promise<Payment[]> => {
+    if (!input.lines || input.lines.length === 0) {
+      throw new Error('Debes ingresar al menos una línea de pago.');
+    }
+
+    const activeCashSession = await db
+      .selectFrom('cash_sessions')
+      .select('id')
+      .where('status', '=', 'open')
+      .executeTakeFirst();
+
+    if (!activeCashSession) {
+      throw new Error(
+        'La caja no está abierta. Dirígete a la sección Caja y ábrela antes de registrar pagos.'
+      );
+    }
+
+    const totalAmount = input.lines.reduce((sum, l) => sum + Number(l.amount || 0), 0);
+    if (totalAmount <= 0) {
+      throw new Error('El monto total del pago debe ser mayor a 0.');
+    }
+
+    const order = await db
+      .selectFrom('orders')
+      .selectAll()
+      .where('id', '=', input.orderId)
+      .executeTakeFirstOrThrow();
+
+    const balanceDue = Number(order.balance_due);
+    const amountToApply = Math.min(totalAmount, balanceDue);
+    const newPaidTotal = Number(order.paid_total) + amountToApply;
+    const newBalance = Math.max(0, Number(order.total) - newPaidTotal);
+
+    const insertedIds: number[] = [];
+
+    await db.transaction().execute(async (trx) => {
+      const cashSession = await trx
+        .selectFrom('cash_sessions')
+        .selectAll()
+        .where('status', '=', 'open')
+        .orderBy('id desc')
+        .executeTakeFirstOrThrow();
+
+      // Insert each payment line proportionally applied to the balance
+      let remaining = amountToApply;
+      for (const line of input.lines) {
+        const lineAmount = Math.min(Number(line.amount || 0), remaining);
+        if (lineAmount <= 0) continue;
+        remaining -= lineAmount;
+
+        const paymentMethod = await trx
+          .selectFrom('payment_methods')
+          .select(['name'])
+          .where('id', '=', line.paymentMethodId)
+          .executeTakeFirst();
+
+        const inserted = await trx
+          .insertInto('payments')
+          .values({
+            order_id: input.orderId,
+            payment_method_id: line.paymentMethodId,
+            amount: lineAmount,
+            reference: line.reference,
+            notes: input.notes ?? null
+          })
+          .executeTakeFirstOrThrow();
+
+        insertedIds.push(Number(inserted.insertId));
+
+        await trx
+          .insertInto('cash_movements')
+          .values({
+            cash_session_id: cashSession.id,
+            movement_type: 'PAYMENT_IN',
+            amount: lineAmount,
+            notes: `Pago orden #${input.orderId} · ${paymentMethod?.name ?? 'Método desconocido'}${line.reference ? ` · Ref: ${line.reference}` : ''}`,
+            created_by: 1
+          })
+          .execute();
+      }
+
+      await trx
+        .updateTable('orders')
+        .set({ paid_total: newPaidTotal, balance_due: newBalance })
+        .where('id', '=', input.orderId)
+        .execute();
+
+      if (newBalance <= 0) {
+        const readyStatus = await trx
+          .selectFrom('order_statuses')
+          .selectAll()
+          .where('code', '=', 'READY_FOR_DELIVERY')
+          .executeTakeFirst();
+
+        if (readyStatus && order.status_id !== readyStatus.id) {
+          await trx
+            .updateTable('orders')
+            .set({ status_id: readyStatus.id })
+            .where('id', '=', input.orderId)
+            .execute();
+
+          await trx
+            .insertInto('order_status_history')
+            .values({
+              order_id: input.orderId,
+              status_id: readyStatus.id,
+              notes: 'Estado automático: orden pagada completamente'
+            })
+            .execute();
+        }
+      }
+
+      await trx
+        .insertInto('audit_logs')
+        .values({
+          action: 'PAYMENT_BATCH_CREATE',
+          entity_type: 'order',
+          entity_id: String(input.orderId),
+          details_json: JSON.stringify({ orderId: input.orderId, totalAmount: amountToApply, lines: input.lines })
+        })
+        .execute();
+    });
+
+    const allPayments = await list(input.orderId);
+    return allPayments.filter((p) => insertedIds.includes(p.id));
+  };
+
+  return { list, create, createBatch };
 };

@@ -190,10 +190,7 @@ export type OrderInput = {
   dueDate: string | null;
   discountTotal: number;
   discountReason: string | null;
-  paidAmount: number;
-  initialPaymentMethodId?: number | null;
-  initialPaymentReference?: string | null;
-  initialPaymentReason?: string | null;
+  initialPaymentLines: PaymentLineInput[];
   items: OrderItemInput[];
 };
 
@@ -221,6 +218,18 @@ export type PaymentInput = {
   paymentMethodId: number;
   amount: number;
   reference: string | null;
+  notes?: string | null;
+};
+
+export type PaymentLineInput = {
+  paymentMethodId: number;
+  amount: number;
+  reference: string | null;
+};
+
+export type BatchPaymentInput = {
+  orderId: number;
+  lines: PaymentLineInput[];
   notes?: string | null;
 };
 
@@ -392,6 +401,7 @@ export type CashSessionSummary = {
     openedByPhone?: string | null;
   } | null;
   suggestedOpeningAmount: number;
+  systemAmount: number;
   lastClosure: {
     id: number;
     cashSessionId: number;
@@ -515,19 +525,4 @@ export type ReportsSummary = {
     count: number;
     total: number;
   }>;
-};
-export type CreateOrderInput = {
-  clientId: number;
-  dueDate?: string | null;
-  notes?: string | null;
-  items: {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-  }[];
-
-  // 👇 NUEVO
-  paidTotal?: number;
-  initialPaymentMethodId?: number | null;
-  initialPaymentReference?: string | null;
 };

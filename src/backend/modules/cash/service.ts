@@ -114,13 +114,28 @@ export const createCashService = (db: Kysely<Database>) => ({
         (eb) => eb.fn.sum<number>('p.amount').as('amount')
       ])
       .where('p.created_at', '>=', active.opened_at)
+      .where('p.created_at', '<=', closureMoment)
       .groupBy('pm.name')
       .execute();
 
-    const paymentsTotal = totalsByMethod.reduce(
-      (sum, item) => sum + Number(item.amount ?? 0),
-      0
-    );
+    const movementTotals = await db
+      .selectFrom('cash_movements')
+      .select([
+        'movement_type',
+        (eb) => eb.fn.sum<number>('amount').as('amount')
+      ])
+      .where('cash_session_id', '=', active.id)
+      .where('created_at', '>=', active.opened_at)
+      .where('created_at', '<=', closureMoment)
+      .groupBy('movement_type')
+      .execute();
+
+    const movementNet = movementTotals.reduce((sum, item) => {
+      const amount = Number(item.amount ?? 0);
+      const type = String(item.movement_type ?? '').toUpperCase();
+      const isOut = type.endsWith('_OUT');
+      return sum + (isOut ? -amount : amount);
+    }, 0);
 
     const deliveredOrders = await db
       .selectFrom('delivery_records as d')
@@ -171,7 +186,7 @@ export const createCashService = (db: Kysely<Database>) => ({
       .execute();
 
     const openingAmount = Number(active.opening_amount ?? 0);
-    const systemAmount = openingAmount + paymentsTotal;
+    const systemAmount = openingAmount + movementNet;
     const differenceAmount = declaredAmount - systemAmount;
 
     const closureResult = await db.transaction().execute(async (trx) => {
@@ -228,6 +243,7 @@ export const createCashService = (db: Kysely<Database>) => ({
             declaredAmount,
             systemAmount,
             differenceAmount,
+            movementNet,
             openedByName: active.opened_by_name ?? null,
             openedByPhone: active.opened_by_phone ?? null
           })
@@ -298,6 +314,7 @@ export const createCashService = (db: Kysely<Database>) => ({
       return {
         activeSession: null,
         suggestedOpeningAmount: Number(lastClosure?.declared_amount ?? 0),
+        systemAmount: 0,
         lastClosure: lastClosure
           ? {
               id: lastClosure.id,
@@ -332,16 +349,38 @@ export const createCashService = (db: Kysely<Database>) => ({
       .limit(10)
       .execute();
 
+    const movementTotals = await db
+      .selectFrom('cash_movements')
+      .select([
+        'movement_type',
+        (eb) => eb.fn.sum<number>('amount').as('amount')
+      ])
+      .where('cash_session_id', '=', active.id)
+      .where('created_at', '>=', active.opened_at)
+      .groupBy('movement_type')
+      .execute();
+
+    const movementNet = movementTotals.reduce((sum, item) => {
+      const amount = Number(item.amount ?? 0);
+      const type = String(item.movement_type ?? '').toUpperCase();
+      const isOut = type.endsWith('_OUT');
+      return sum + (isOut ? -amount : amount);
+    }, 0);
+
+    const openingAmount = Number(active.opening_amount);
+    const systemAmount = openingAmount + movementNet;
+
     return {
       activeSession: {
         id: active.id,
-        openingAmount: Number(active.opening_amount),
+        openingAmount,
         openedAt: new Date(active.opened_at).toISOString(),
         status: active.status,
         openedByName: active.opened_by_name ?? null,
         openedByPhone: active.opened_by_phone ?? null
       },
       suggestedOpeningAmount: Number(lastClosure?.declared_amount ?? 0),
+      systemAmount,
       lastClosure: lastClosure
         ? {
             id: lastClosure.id,

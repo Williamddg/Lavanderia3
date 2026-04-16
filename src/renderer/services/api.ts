@@ -1,4 +1,5 @@
 import type {
+  BatchPaymentInput,
   Expense,
   ExpenseInput,
   ApiResponse,
@@ -133,6 +134,7 @@ export const api = {
 
   listPayments: (orderId?: number) => unwrap<Payment[]>(window.desktopApi.listPayments(orderId)),
   createPayment: (input: PaymentInput) => unwrap<Payment>(window.desktopApi.createPayment(input)),
+  createPaymentBatch: (input: BatchPaymentInput) => unwrap<Payment[]>(window.desktopApi.createPaymentBatch(input)),
 
   listInvoices: () => unwrap<Invoice[]>(window.desktopApi.listInvoices()),
   invoiceDetail: (id: number) => unwrap<InvoiceDetail>(window.desktopApi.getInvoiceDetail(id)),

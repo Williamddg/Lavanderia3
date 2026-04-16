@@ -36,6 +36,27 @@ const normalizeSearch = (value: string) => {
   return raw;
 };
 
+const normalizePhone = (raw?: string | null) => {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('57') && digits.length >= 12) return digits;
+  if (digits.length === 10) return `57${digits}`;
+  if (digits.length > 10 && !digits.startsWith('57')) return `57${digits.slice(-10)}`;
+  return digits;
+};
+
+const buildDeliveredMessage = ({
+  clientName,
+  orderNumber
+}: {
+  clientName: string;
+  orderNumber: string;
+}) => `Hola ${clientName} 👋
+
+Tu orden *${orderNumber}* fue entregada correctamente.
+
+Gracias por confiar en nosotros.`;
+
 export const DeliveriesPage = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,6 +69,10 @@ export const DeliveriesPage = () => {
   const { data: orders = [] } = useQuery({
     queryKey: ['orders'],
     queryFn: api.listOrders
+  });
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: api.listClients
   });
 
   const [open, setOpen] = useState(false);
@@ -62,7 +87,11 @@ export const DeliveriesPage = () => {
 
   const mutation = useMutation({
     mutationFn: api.createDelivery,
-    onSuccess: async () => {
+    onSuccess: async (_delivery, variables) => {
+      const relatedOrder = orders.find((order) => order.id === variables.orderId);
+      const relatedClient = clients.find((client) => client.id === relatedOrder?.clientId);
+      const customerPhone = normalizePhone(relatedClient?.phone ?? variables.receiverPhone);
+
       setOpen(false);
       setForm(emptyForm);
       setFormError(null);
@@ -70,15 +99,30 @@ export const DeliveriesPage = () => {
 
       await queryClient.invalidateQueries({ queryKey: ['deliveries'] });
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
+
+      if (relatedOrder && customerPhone) {
+        const url = `https://wa.me/${customerPhone}?text=${encodeURIComponent(
+          buildDeliveredMessage({
+            clientName: relatedOrder.clientName,
+            orderNumber: relatedOrder.orderNumber
+          })
+        )}`;
+        await api.openExternal(url);
+      }
     }
   });
 
-  const deliverableOrders = orders.filter(
-    (order) =>
-      !['ENTREGADO', 'DELIVERED', 'CANCELADO', 'CANCELED'].includes(
-        order.statusName.toUpperCase()
-      )
-  );
+  const deliverableOrders = orders.filter((order) => {
+    const statusCode = String(order.statusCode ?? '').toUpperCase();
+    return !['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'].includes(statusCode);
+  });
+
+  const getOrderClientPhone = (orderId: number) => {
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return null;
+    const client = clients.find((item) => item.id === order.clientId);
+    return client?.phone ?? null;
+  };
 
   // 🔥 AUTO ABRIR DESDE ORDEN
   useEffect(() => {
@@ -96,8 +140,8 @@ export const DeliveriesPage = () => {
       ...prev,
       orderId: selectedOrder.id,
       ticketCode: selectedOrder.orderNumber,
-      deliveredTo: selectedOrder.clientName ?? ''
-      // ❌ NO teléfono automático
+      deliveredTo: selectedOrder.clientName ?? '',
+      receiverPhone: getOrderClientPhone(selectedOrder.id)
     }));
 
     setModalOrderFilter(selectedOrder.orderNumber);
@@ -108,6 +152,7 @@ export const DeliveriesPage = () => {
     shouldOpenFromOrder,
     requestedOrderId,
     deliverableOrders,
+    clients,
     setSearchParams
   ]);
 
@@ -138,16 +183,12 @@ export const DeliveriesPage = () => {
 
     if (!selected) return 'Debes seleccionar una orden válida.';
 
-    const status = selected.statusName.toUpperCase();
+    const statusCode = String(selected.statusCode ?? '').toUpperCase();
+    const statusName = String(selected.statusName ?? '').toUpperCase();
 
-if (
-  ![
-    'LISTO PARA ENTREGAR',
-    'READY FOR DELIVERY'
-  ].includes(status)
-) {
-  return 'La orden no está lista para entrega. Debes cambiar el estado a "LISTO PARA ENTREGAR".';
-}
+    if (!['READY', 'READY_FOR_DELIVERY'].includes(statusCode) && !statusName.includes('LISTO')) {
+      return 'La orden no está lista para entrega. Debes cambiar el estado a "LISTO PARA ENTREGAR".';
+    }
 
     if (Number(selected.balanceDue ?? 0) > 0) {
       return `La orden tiene saldo pendiente (${currency(
@@ -281,7 +322,8 @@ if (
                   ...prev,
                   orderId: selectedId,
                   ticketCode: selectedOrder?.orderNumber ?? prev.ticketCode,
-                  deliveredTo: selectedOrder?.clientName ?? prev.deliveredTo
+                  deliveredTo: selectedOrder?.clientName ?? prev.deliveredTo,
+                  receiverPhone: getOrderClientPhone(selectedId)
                 }));
 
                 setModalOrderFilter(selectedOrder?.orderNumber ?? '');
