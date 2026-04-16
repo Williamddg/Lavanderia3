@@ -52,11 +52,11 @@ export const LicensePage = ({ onActivated }: Props) => {
           </div>
 
           <div className="urgency">
-            ⚠️ No activar el sistema puede generar desorden, pérdidas y mala imagen.
+            Tu licencia activa todo el sistema de forma inmediata, sin pasos adicionales.
           </div>
 
           <div className="social-proof">
-            Más negocios ya están usando LavaSuite para crecer 🚀
+            Desarrollado en Colombia para negocios textiles que quieren operar con orden
           </div>
         </div>
 
