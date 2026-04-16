@@ -1,8 +1,8 @@
-CREATE DATABASE  IF NOT EXISTS `lavanderia_sastreria_v2` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
-USE `lavanderia_sastreria_v2`;
+CREATE DATABASE  IF NOT EXISTS `lavand` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+USE `lavand`;
 -- MySQL dump 10.13  Distrib 8.0.45, for Win64 (x86_64)
 --
--- Host: localhost    Database: lavanderia_sastreria_v2
+-- Host: localhost    Database: lavand
 -- ------------------------------------------------------
 -- Server version	8.0.45
 
@@ -126,7 +126,7 @@ CREATE TABLE `backups` (
 
 LOCK TABLES `backups` WRITE;
 /*!40000 ALTER TABLE `backups` DISABLE KEYS */;
-INSERT INTO `backups` VALUES (1,'backup_lavanderia_sastreria_v2_2026-04-03_04-08-11.sql','1A1gRha3dZs6RBtUYOWds6SJoNiI6wzFM','DONE','Backup subido correctamente','2026-04-03 09:08:11'),(2,'backup_lavanderia_sastreria_v2_2026-04-03_15-04-29.sql','1omOMQu46UGY2cgsbNM3EAUo1rEurWcTp','DONE','Backup subido correctamente','2026-04-03 20:04:30'),(3,'backup_lavanderia_sastreria_v2_2026-04-03_20-17-13.sql','1t7NuWIPlm5DADU3-8RTF_r7vMMkjG0WE','DONE','Backup subido correctamente','2026-04-04 01:17:15'),(4,'backup_lavanderia_sastreria_v2_2026-04-04_02-51-50.sql','1bFKLZKDHZSEvvdOpL_GUlfaUk3u_ZWdI','DONE','Backup subido correctamente','2026-04-04 07:51:51');
+INSERT INTO `backups` VALUES (1,'backup_lavand_2026-04-03_04-08-11.sql','1A1gRha3dZs6RBtUYOWds6SJoNiI6wzFM','DONE','Backup subido correctamente','2026-04-03 09:08:11'),(2,'backup_lavand_2026-04-03_15-04-29.sql','1omOMQu46UGY2cgsbNM3EAUo1rEurWcTp','DONE','Backup subido correctamente','2026-04-03 20:04:30'),(3,'backup_lavand_2026-04-03_20-17-13.sql','1t7NuWIPlm5DADU3-8RTF_r7vMMkjG0WE','DONE','Backup subido correctamente','2026-04-04 01:17:15'),(4,'backup_lavand_2026-04-04_02-51-50.sql','1bFKLZKDHZSEvvdOpL_GUlfaUk3u_ZWdI','DONE','Backup subido correctamente','2026-04-04 07:51:51');
 /*!40000 ALTER TABLE `backups` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1348,11 +1348,11 @@ INSERT INTO `warranty_statuses` VALUES (1,'OPEN','Abierta','amber'),(2,'RESOLVED
 UNLOCK TABLES;
 
 --
--- Dumping events for database 'lavanderia_sastreria_v2'
+-- Dumping events for database 'lavand'
 --
 
 --
--- Dumping routines for database 'lavanderia_sastreria_v2'
+-- Dumping routines for database 'lavand'
 --
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

@@ -22,7 +22,6 @@ const createWindow = async () => {
   try {
     if (isDev) {
       await mainWindow.loadURL('http://localhost:5173')
-      mainWindow.webContents.openDevTools()
     } else {
       const indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
       await mainWindow.loadFile(indexPath)
