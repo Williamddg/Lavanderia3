@@ -242,16 +242,28 @@ export const DeliveriesPage = () => {
     return orders.filter((order) => {
       const statusCode = String(order.statusCode ?? '').toUpperCase();
       if (['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'].includes(statusCode)) return false;
+      if (['READY', 'READY_FOR_DELIVERY'].includes(statusCode)) return false;
+      if (String(order.statusName ?? '').toUpperCase().includes('LISTO')) return false;
       return normalizeDateKey(order.dueDate) === todayKey;
     });
   }, [orders]);
 
   const readyForDeliveryRows = useMemo(() => {
-    return orders.filter((order) => {
-      const statusCode = String(order.statusCode ?? '').toUpperCase();
-      if (['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'].includes(statusCode)) return false;
-      return ['READY', 'READY_FOR_DELIVERY'].includes(statusCode) || String(order.statusName).toUpperCase().includes('LISTO');
-    });
+    return orders
+      .filter((order) => {
+        const statusCode = String(order.statusCode ?? '').toUpperCase();
+        if (['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'].includes(statusCode)) return false;
+        return (
+          ['READY', 'READY_FOR_DELIVERY'].includes(statusCode) ||
+          String(order.statusName).toUpperCase().includes('LISTO')
+        );
+      })
+      .sort((a, b) => {
+        const aDue = normalizeDateKey(a.dueDate) ?? '9999-12-31';
+        const bDue = normalizeDateKey(b.dueDate) ?? '9999-12-31';
+        if (aDue !== bDue) return aDue.localeCompare(bDue);
+        return String(a.orderNumber).localeCompare(String(b.orderNumber));
+      });
   }, [orders]);
 
   const activeOrdersRows = useMemo(() => {
@@ -280,6 +292,9 @@ export const DeliveriesPage = () => {
 
   const buildThermalListHtml = (
     title: string,
+    companyName: string,
+    generatedAt: string,
+    summary: { orders: number; total: number; paid: number; balance: number },
     rows: Array<{
       orderNumber: string;
       clientName: string;
@@ -288,6 +303,7 @@ export const DeliveriesPage = () => {
       paidTotal: number;
       balanceDue: number;
       statusName: string;
+      itemsCount?: number;
     }>
   ) => {
     const money = (v: number) =>
@@ -302,11 +318,12 @@ export const DeliveriesPage = () => {
           .map(
             (row, idx) => `
               <div class="item">
-                <div><strong>${idx + 1}. ${row.orderNumber}</strong></div>
-                <div>${row.clientName}</div>
-                <div>Estado: ${row.statusName}</div>
-                <div>Fecha promesa: ${row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-CO') : '—'}</div>
-                <div>Total: ${money(row.total)} | Abono: ${money(row.paidTotal)} | Saldo: ${money(row.balanceDue)}</div>
+              <div><strong>${idx + 1}. ${row.orderNumber}</strong></div>
+              <div>${row.clientName}</div>
+              <div>Ítems: ${Number(row.itemsCount ?? 0)}</div>
+              <div>Estado: ${row.statusName}</div>
+              <div>Fecha promesa: ${row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-CO') : '—'}</div>
+              <div>Total: ${money(row.total)} | Abono: ${money(row.paidTotal)} | Saldo: ${money(row.balanceDue)}</div>
               </div>
             `
           )
@@ -320,22 +337,33 @@ export const DeliveriesPage = () => {
         <title>${title}</title>
         <style>
           @page { size: 80mm auto; margin: 2mm; }
-          body { font-family: monospace; color: #000; margin: 0; padding: 0; width: 76mm; font-size: 11px; }
-          .wrap { padding: 2mm; }
-          h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
-          .item { border-top: 1px dashed #000; padding: 6px 0; }
+      body { font-family: monospace; color: #000; margin: 0; padding: 0; width: 76mm; font-size: 11px; }
+      .wrap { padding: 2mm; }
+      h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
+      .meta { margin: 0 0 6px; font-size: 10px; color: #333; }
+      .item { border-top: 1px dashed #000; padding: 6px 0; }
+      .resume { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 8px 0; }
+      .resume div { display: flex; justify-content: space-between; gap: 8px; }
         </style>
       </head>
       <body>
         <div class="wrap">
+          <h1>${companyName || 'Lavandería'}</h1>
+          <div class="meta">${generatedAt}</div>
           <h1>${title}</h1>
+          <div class="resume">
+            <div><span>Órdenes</span><strong>${summary.orders}</strong></div>
+            <div><span>Total</span><strong>${money(summary.total)}</strong></div>
+            <div><span>Abonos</span><strong>${money(summary.paid)}</strong></div>
+            <div><span>Saldo</span><strong>${money(summary.balance)}</strong></div>
+          </div>
           ${body}
         </div>
       </body>
     </html>`;
   };
 
-  const printThermalList = (
+  const printThermalList = async (
     title: string,
     rows: Array<{
       orderNumber: string;
@@ -347,10 +375,40 @@ export const DeliveriesPage = () => {
       statusName: string;
     }>
   ) => {
+    const company = await api.companySettings().catch(() => null);
+    const generatedAt = new Date().toLocaleString('es-CO');
+    const enriched = await Promise.all(
+      rows.map(async (row) => {
+        const order = orders.find((item) => item.orderNumber === row.orderNumber);
+        if (!order) return { ...row, itemsCount: 0 };
+        const detail = await api.orderDetail(order.id).catch(() => null);
+        return { ...row, itemsCount: detail?.items?.length ?? 0 };
+      })
+    );
+
+    const summary = enriched.reduce(
+      (acc, row) => {
+        acc.orders += 1;
+        acc.total += Number(row.total ?? 0);
+        acc.paid += Number(row.paidTotal ?? 0);
+        acc.balance += Number(row.balanceDue ?? 0);
+        return acc;
+      },
+      { orders: 0, total: 0, paid: 0, balance: 0 }
+    );
+
     const win = window.open('', '_blank', 'width=430,height=900');
     if (!win) return;
     win.document.open();
-    win.document.write(buildThermalListHtml(title, rows));
+    win.document.write(
+      buildThermalListHtml(
+        title,
+        company?.companyName ?? 'Lavandería',
+        generatedAt,
+        summary,
+        enriched
+      )
+    );
     win.document.close();
     win.onload = () => {
       win.focus();
@@ -463,7 +521,12 @@ export const DeliveriesPage = () => {
         style={{ display: exportMode && exportMode !== 'due-today' ? 'none' : 'block' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <h3 style={{ margin: 0 }}>Órdenes que se deben entregar hoy</h3>
+          <div className="stack-gap" style={{ gap: 4 }}>
+            <h3 style={{ margin: 0 }}>Órdenes prometidas para hoy (aún en proceso)</h3>
+            <p style={{ margin: 0, color: '#64748b' }}>
+              Incluye órdenes con fecha promesa de hoy que todavía no están en estado listo.
+            </p>
+          </div>
           <div className="row-actions no-print">
             <Button
               type="button"
@@ -500,7 +563,12 @@ export const DeliveriesPage = () => {
         style={{ display: exportMode && exportMode !== 'ready' ? 'none' : 'block' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <h3 style={{ margin: 0 }}>Órdenes listas para entregar</h3>
+          <div className="stack-gap" style={{ gap: 4 }}>
+            <h3 style={{ margin: 0 }}>Órdenes listas para entregar</h3>
+            <p style={{ margin: 0, color: '#64748b' }}>
+              Organizadas por fecha promesa para priorizar salida de prendas.
+            </p>
+          </div>
           <div className="row-actions no-print">
             <Button
               type="button"
@@ -577,7 +645,12 @@ export const DeliveriesPage = () => {
       </div>
 
       <div className="card-panel stack-gap">
-        <h3 style={{ margin: 0 }}>Órdenes entregadas hoy</h3>
+        <div className="stack-gap" style={{ gap: 4 }}>
+          <h3 style={{ margin: 0 }}>Órdenes entregadas hoy</h3>
+          <p style={{ margin: 0, color: '#64748b' }}>
+            Historial de entregas del día (sección final informativa).
+          </p>
+        </div>
         <DataTable
           rows={deliveredTodayRows}
           columns={[

@@ -33,6 +33,13 @@ const mapWarranty = (row: any): WarrantyRecord => ({
 });
 
 export const createWarrantiesService = (db: Kysely<Database>) => {
+  const findOrderStatusByCode = async (code: string) =>
+    db
+      .selectFrom('order_statuses')
+      .select(['id', 'name', 'code'])
+      .where('code', '=', code)
+      .executeTakeFirst();
+
   const listStatuses = async (): Promise<WarrantyStatus[]> => {
     const rows = await db
       .selectFrom('warranty_statuses')
@@ -109,6 +116,8 @@ export const createWarrantiesService = (db: Kysely<Database>) => {
     }
 
     const result = await db.transaction().execute(async (trx) => {
+      const warrantyOrderStatus = await findOrderStatusByCode('WARRANTY');
+
       const inserted = await trx
         .insertInto('warranties')
         .values({
@@ -118,6 +127,32 @@ export const createWarrantiesService = (db: Kysely<Database>) => {
           resolution: null
         })
         .executeTakeFirstOrThrow();
+
+      if (warrantyOrderStatus) {
+        await trx
+          .updateTable('orders')
+          .set({ status_id: warrantyOrderStatus.id })
+          .where('id', '=', parsed.orderId)
+          .execute();
+
+        await trx
+          .insertInto('order_status_history')
+          .values({
+            order_id: parsed.orderId,
+            status_id: warrantyOrderStatus.id,
+            notes: `Garantía abierta: ${parsed.reason}`
+          })
+          .execute();
+
+        await trx
+          .insertInto('order_logs')
+          .values({
+            order_id: parsed.orderId,
+            event_type: 'STATUS_CHANGE',
+            description: `Estado actualizado a ${warrantyOrderStatus.name}`
+          })
+          .execute();
+      }
 
       await trx
         .insertInto('audit_logs')
@@ -194,6 +229,63 @@ export const createWarrantiesService = (db: Kysely<Database>) => {
         })
         .where('id', '=', id)
         .execute();
+
+      const orderIdRow = await trx
+        .selectFrom('warranties')
+        .select('order_id')
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow();
+
+      const statusCode = String(status.code ?? '').toUpperCase();
+
+      if (statusCode === 'OPEN') {
+        const warrantyOrderStatus = await findOrderStatusByCode('WARRANTY');
+        if (warrantyOrderStatus) {
+          await trx
+            .updateTable('orders')
+            .set({ status_id: warrantyOrderStatus.id })
+            .where('id', '=', orderIdRow.order_id)
+            .execute();
+
+          await trx
+            .insertInto('order_status_history')
+            .values({
+              order_id: orderIdRow.order_id,
+              status_id: warrantyOrderStatus.id,
+              notes: 'Garantía reabierta'
+            })
+            .execute();
+        }
+      }
+
+      if (['RESOLVED', 'CLOSED'].includes(statusCode)) {
+        const readyOrderStatus = await findOrderStatusByCode('READY_FOR_DELIVERY');
+        if (readyOrderStatus) {
+          await trx
+            .updateTable('orders')
+            .set({ status_id: readyOrderStatus.id })
+            .where('id', '=', orderIdRow.order_id)
+            .execute();
+
+          await trx
+            .insertInto('order_status_history')
+            .values({
+              order_id: orderIdRow.order_id,
+              status_id: readyOrderStatus.id,
+              notes: 'Garantía cerrada/resuelta'
+            })
+            .execute();
+
+          await trx
+            .insertInto('order_logs')
+            .values({
+              order_id: orderIdRow.order_id,
+              event_type: 'STATUS_CHANGE',
+              description: `Estado actualizado a ${readyOrderStatus.name}`
+            })
+            .execute();
+        }
+      }
 
       await trx
         .insertInto('audit_logs')

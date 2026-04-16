@@ -57,7 +57,12 @@ const BarChart = ({
   );
 };
 
-const buildThermalReportHtml = (title: string, data: ReportsSummary) => `<!doctype html>
+const buildThermalReportHtml = (
+  title: string,
+  data: ReportsSummary,
+  companyName: string,
+  generatedAt: string
+) => `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -67,16 +72,20 @@ const buildThermalReportHtml = (title: string, data: ReportsSummary) => `<!docty
       body { font-family: monospace; color: #000; margin: 0; padding: 0; width: 76mm; font-size: 11px; }
       .wrap { padding: 2mm; }
       h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
+      .meta { color: #444; font-size: 10px; margin: 0 0 6px; }
       .line { display: flex; justify-content: space-between; border-top: 1px dashed #000; padding: 4px 0; gap: 8px; }
       .muted { color: #444; }
     </style>
   </head>
   <body>
     <div class="wrap">
+      <h1>${companyName || 'Lavandería'}</h1>
+      <div class="meta">${generatedAt}</div>
       <h1>${title}</h1>
       <div class="muted">${data.from} a ${data.to}</div>
       <div class="line"><span>Ventas</span><strong>${currency(data.totalSales)}</strong></div>
       <div class="line"><span>Gastos</span><strong>${currency(data.totalExpenses)}</strong></div>
+      <div class="line"><span>Devoluciones (PAYMENT_OUT)</span><strong>${currency(data.totalPaymentOut)}</strong></div>
       <div class="line"><span>Utilidad</span><strong>${currency(data.netUtility)}</strong></div>
       <div class="line"><span>Pagos</span><strong>${currency(data.totalPayments)}</strong></div>
       <div class="line"><span>Órdenes</span><strong>${data.totalOrders}</strong></div>
@@ -125,6 +134,7 @@ const ReportSection = ({
       <div className="summary-grid">
         <SummaryCard title="Ventas" value={currency(data?.totalSales ?? 0)} accent="#5fae88" />
         <SummaryCard title="Gastos" value={currency(data?.totalExpenses ?? 0)} accent="#c97373" />
+        <SummaryCard title="Devoluciones" value={currency(data?.totalPaymentOut ?? 0)} accent="#af5a5a" />
         <SummaryCard title="Utilidad" value={currency(data?.netUtility ?? 0)} accent="#5a7cff" />
         <SummaryCard title="Pagos" value={currency(data?.totalPayments ?? 0)} accent="#d89d4f" />
       </div>
@@ -164,6 +174,20 @@ const ReportSection = ({
             ]}
           />
         </div>
+        <div className="card-panel">
+          <h3>Gastos por método</h3>
+          <DataTable
+            rows={data?.expensesByPaymentMethod ?? []}
+            columns={[
+              { key: 'method', header: 'Método', render: (row) => row.methodName },
+              { key: 'count', header: 'Registros', render: (row) => row.count },
+              { key: 'amount', header: 'Monto', render: (row) => currency(row.amount) }
+            ]}
+          />
+        </div>
+      </div>
+
+      <div className="split-grid">
         <div className="card-panel">
           <h3>Gastos por categoría</h3>
           <DataTable
@@ -216,6 +240,10 @@ export const ReportsPage = () => {
     queryKey: ['pdf-output-dir'],
     queryFn: api.getPdfOutputDir
   });
+  const { data: company } = useQuery({
+    queryKey: ['company-settings-report-print'],
+    queryFn: api.companySettings
+  });
 
   const dayQuery = useQuery({
     queryKey: ['reports-summary-day', todayKey, todayKey],
@@ -263,8 +291,16 @@ export const ReportsPage = () => {
     if (!data) return;
     const win = window.open('', '_blank', 'width=430,height=900');
     if (!win) return;
+    const generatedAt = new Date().toLocaleString('es-CO');
     win.document.open();
-    win.document.write(buildThermalReportHtml(title, data));
+    win.document.write(
+      buildThermalReportHtml(
+        title,
+        data,
+        company?.companyName ?? 'Lavandería',
+        generatedAt
+      )
+    );
     win.document.close();
     win.onload = () => {
       win.focus();

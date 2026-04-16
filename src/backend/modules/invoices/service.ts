@@ -102,6 +102,70 @@ const mapInvoice = (row: any): Invoice => ({
 });
 
 export const createInvoicesService = (db: Kysely<Database>) => {
+  let invoiceItemColumnsCache: Set<string> | null = null;
+
+  const getInvoiceItemColumns = async () => {
+    if (invoiceItemColumnsCache) return invoiceItemColumnsCache;
+
+    const rows = await sql<{ column_name: string }>`
+      SELECT COLUMN_NAME AS column_name
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'invoice_items_snapshot'
+    `.execute(db);
+
+    invoiceItemColumnsCache = new Set(
+      rows.rows.map((row) => String(row.column_name))
+    );
+
+    return invoiceItemColumnsCache;
+  };
+
+  const buildInvoiceItemSnapshotValues = async (
+    invoiceId: number,
+    orderItems: Array<any>
+  ) => {
+    const columns = await getInvoiceItemColumns();
+
+    return orderItems.map((item) => {
+      const fullPayload: Record<string, unknown> = {
+        invoice_id: invoiceId,
+        garment_type_id: item.garment_type_id,
+        service_id: item.service_id,
+        description: item.description,
+        quantity: item.quantity,
+        color: item.color,
+        brand: item.brand,
+        size_reference: item.size_reference,
+        material: item.material,
+        received_condition: item.received_condition,
+        work_detail: item.work_detail,
+        stains: item.stains,
+        damages: item.damages,
+        missing_accessories: item.missing_accessories,
+        customer_observations: item.customer_observations,
+        internal_observations: item.internal_observations,
+        unit_price: item.unit_price,
+        discount_amount: item.discount_amount ?? 0,
+        surcharge_amount: item.surcharge_amount ?? 0,
+        subtotal: item.subtotal,
+        total: item.total ?? item.subtotal
+      };
+
+      const filtered = Object.fromEntries(
+        Object.entries(fullPayload).filter(([column]) => columns.has(column))
+      );
+
+      if (!('invoice_id' in filtered)) filtered.invoice_id = invoiceId;
+      if (!('description' in filtered)) filtered.description = item.description;
+      if (!('quantity' in filtered)) filtered.quantity = item.quantity;
+      if (!('unit_price' in filtered)) filtered.unit_price = item.unit_price;
+      if (!('subtotal' in filtered)) filtered.subtotal = item.subtotal;
+
+      return filtered;
+    });
+  };
+
   const getClientActiveOrders = async (clientId: number, excludeOrderId: number) => {
     const rows = await db
       .selectFrom('orders as o')
@@ -349,31 +413,7 @@ export const createInvoicesService = (db: Kysely<Database>) => {
 
         await trx
           .insertInto('invoice_items_snapshot')
-          .values(
-            orderItems.map((item) => ({
-              invoice_id: invoiceId,
-              garment_type_id: item.garment_type_id,
-              service_id: item.service_id,
-              description: item.description,
-              quantity: item.quantity,
-              color: item.color,
-              brand: item.brand,
-              size_reference: item.size_reference,
-              material: item.material,
-              received_condition: item.received_condition,
-              work_detail: item.work_detail,
-              stains: item.stains,
-              damages: item.damages,
-              missing_accessories: item.missing_accessories,
-              customer_observations: item.customer_observations,
-              internal_observations: item.internal_observations,
-              unit_price: item.unit_price,
-              discount_amount: item.discount_amount ?? 0,
-              surcharge_amount: item.surcharge_amount ?? 0,
-              subtotal: item.subtotal,
-              total: item.total ?? item.subtotal
-            }))
-          )
+          .values((await buildInvoiceItemSnapshotValues(invoiceId, orderItems)) as any)
           .execute();
 
         await trx
@@ -428,31 +468,7 @@ export const createInvoicesService = (db: Kysely<Database>) => {
 
       await trx
         .insertInto('invoice_items_snapshot')
-        .values(
-          orderItems.map((item) => ({
-            invoice_id: invoiceId,
-            garment_type_id: item.garment_type_id,
-            service_id: item.service_id,
-            description: item.description,
-            quantity: item.quantity,
-            color: item.color,
-            brand: item.brand,
-            size_reference: item.size_reference,
-            material: item.material,
-            received_condition: item.received_condition,
-            work_detail: item.work_detail,
-            stains: item.stains,
-            damages: item.damages,
-            missing_accessories: item.missing_accessories,
-            customer_observations: item.customer_observations,
-            internal_observations: item.internal_observations,
-            unit_price: item.unit_price,
-            discount_amount: item.discount_amount ?? 0,
-            surcharge_amount: item.surcharge_amount ?? 0,
-            subtotal: item.subtotal,
-            total: item.total ?? item.subtotal
-          }))
-        )
+        .values((await buildInvoiceItemSnapshotValues(invoiceId, orderItems)) as any)
         .execute();
 
       await trx

@@ -7,6 +7,7 @@ import { currency, dateTime } from '@renderer/utils/format';
 
 const emptyForm: ExpenseInput = {
   categoryId: 0,
+  paymentMethodId: 0,
   amount: 0,
   description: '',
   expenseDate: new Date().toISOString().slice(0, 10)
@@ -24,6 +25,11 @@ export const ExpensesPage = () => {
     queryKey: ['expense-categories'],
     queryFn: api.listExpenseCategories
   });
+  const { data: catalogs } = useQuery({
+    queryKey: ['order-catalogs-expenses'],
+    queryFn: api.orderCatalogs
+  });
+  const paymentMethods = catalogs?.paymentMethods ?? [];
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ExpenseInput>(emptyForm);
@@ -38,7 +44,8 @@ export const ExpensesPage = () => {
       setOpen(false);
       setForm({
         ...emptyForm,
-        categoryId: categories[0]?.id ?? 0
+        categoryId: categories[0]?.id ?? 0,
+        paymentMethodId: paymentMethods[0]?.id ?? 0
       });
       setFormError('');
       await queryClient.invalidateQueries({ queryKey: ['expenses'] });
@@ -67,7 +74,8 @@ export const ExpensesPage = () => {
   const handleOpenModal = () => {
     setForm({
       ...emptyForm,
-      categoryId: categories[0]?.id ?? 0
+      categoryId: categories[0]?.id ?? 0,
+      paymentMethodId: paymentMethods[0]?.id ?? 0
     });
     setFormError('');
     setOpen(true);
@@ -77,7 +85,8 @@ export const ExpensesPage = () => {
     setOpen(false);
     setForm({
       ...emptyForm,
-      categoryId: categories[0]?.id ?? 0
+      categoryId: categories[0]?.id ?? 0,
+      paymentMethodId: paymentMethods[0]?.id ?? 0
     });
     setFormError('');
   };
@@ -85,6 +94,7 @@ export const ExpensesPage = () => {
   const handleSubmit = () => {
     const payload: ExpenseInput = {
       categoryId: Number(form.categoryId || 0),
+      paymentMethodId: Number(form.paymentMethodId || 0),
       amount: Number(form.amount || 0),
       description: form.description.trim(),
       expenseDate: form.expenseDate
@@ -97,6 +107,11 @@ export const ExpensesPage = () => {
 
     if (payload.amount <= 0) {
       setFormError('Debes ingresar un monto mayor que cero.');
+      return;
+    }
+
+    if (!payload.paymentMethodId) {
+      setFormError('Debes seleccionar el método de pago.');
       return;
     }
 
@@ -160,6 +175,11 @@ export const ExpensesPage = () => {
               render: (row) => row.description
             },
             {
+              key: 'paymentMethod',
+              header: 'Método',
+              render: (row) => row.paymentMethodName || 'Sin método'
+            },
+            {
               key: 'amount',
               header: 'Monto',
               render: (row) => currency(row.amount)
@@ -191,6 +211,27 @@ export const ExpensesPage = () => {
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Método de pago</span>
+            <select
+              className="field"
+              value={form.paymentMethodId}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  paymentMethodId: Number(e.target.value)
+                }))
+              }
+            >
+              <option value={0}>Selecciona un método</option>
+              {paymentMethods.map((method) => (
+                <option key={method.id} value={method.id}>
+                  {method.name}
                 </option>
               ))}
             </select>

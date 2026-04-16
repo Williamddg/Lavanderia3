@@ -61,6 +61,7 @@ export const InvoiceDetailPage = () => {
     .toUpperCase();
 
   const normalizedPhone = String(data.clientPhone ?? '').replace(/\D/g, '');
+  const activeOrders = Array.isArray(data.activeOrders) ? data.activeOrders : [];
 
   const handleDownloadPdf = async () => {
     try {
@@ -96,11 +97,15 @@ export const InvoiceDetailPage = () => {
     if (!data || autoSavedRef.current) return;
     autoSavedRef.current = true;
     const dayFolder = new Date().toISOString().slice(0, 10);
-    void api.printToPdfAuto({
-      defaultFileName: `Factura-${data.invoiceNumber}.pdf`,
-      targetDir: pdfOutputDir ?? null,
-      subfolder: `Facturas/${dayFolder}`
-    });
+    void api
+      .printToPdfAuto({
+        defaultFileName: `Factura-${data.invoiceNumber}.pdf`,
+        targetDir: pdfOutputDir ?? null,
+        subfolder: `Facturas/${dayFolder}`
+      })
+      .catch((error) => {
+        console.error('No fue posible autoguardar la factura en PDF:', error);
+      });
   }, [data, pdfOutputDir]);
 
   return (
@@ -181,13 +186,13 @@ export const InvoiceDetailPage = () => {
 
         <div className="thermal-divider" />
 
-        {data.activeOrders.length > 0 ? (
+        {activeOrders.length > 0 ? (
           <>
             <div className="thermal-meta">
               <p style={{ marginBottom: 6 }}>
                 <strong>Órdenes activas del cliente</strong>
               </p>
-              {data.activeOrders.map((order) => (
+              {activeOrders.map((order) => (
                 <p key={order.id}>
                   {order.orderNumber} · {order.statusName} · Total {currency(order.total)} · Saldo {currency(order.balanceDue)}
                 </p>
@@ -457,7 +462,7 @@ export const InvoiceDetailPage = () => {
               width: 72mm !important;
               max-width: 72mm !important;
               margin: 0 !important;
-              padding: px 2mm !important;
+              padding: 6px 2mm !important;
               box-sizing: border-box !important;
               font-size: 11px !important;
               line-height: 1.35 !important;

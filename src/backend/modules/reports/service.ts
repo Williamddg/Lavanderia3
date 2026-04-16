@@ -19,6 +19,9 @@ export const createReportsService = (db: Kysely<Database>) => ({
       .selectFrom('payments as p')
       .innerJoin('payment_methods as pm', 'pm.id', 'p.payment_method_id');
     const expenseQuery = db.selectFrom('expenses as e');
+    const paymentOutQuery = db
+      .selectFrom('cash_movements as cm')
+      .where('cm.movement_type', '=', 'PAYMENT_OUT');
 
     const orderFiltered = orderQuery
       .where('o.created_at', '>=', startOfDay(rangeFrom))
@@ -32,10 +35,15 @@ export const createReportsService = (db: Kysely<Database>) => ({
       .where('e.expense_date', '>=', new Date(rangeFrom))
       .where('e.expense_date', '<=', new Date(rangeTo));
 
+    const paymentOutFiltered = paymentOutQuery
+      .where('cm.created_at', '>=', startOfDay(rangeFrom))
+      .where('cm.created_at', '<=', endOfDay(rangeTo));
+
     const [
       totalSalesRow,
       totalPaymentsRow,
       totalExpensesRow,
+      totalPaymentOutRow,
       totalOrdersRow,
       warrantiesCreatedRow,
       warrantiesClosedRow,
@@ -43,10 +51,12 @@ export const createReportsService = (db: Kysely<Database>) => ({
       paymentMethods,
       orderStatuses,
       expensesByCategory,
+      expensesByPaymentMethod,
       biggestExpenses,
       dailySalesRows,
       dailyPaymentsRows,
       dailyExpensesRows,
+      dailyPaymentOutRows,
       dailyOrdersRows
     ] = await Promise.all([
       orderFiltered
@@ -59,6 +69,10 @@ export const createReportsService = (db: Kysely<Database>) => ({
 
       expenseFiltered
         .select((eb) => eb.fn.sum<number>('e.amount').as('sum'))
+        .executeTakeFirst(),
+
+      paymentOutFiltered
+        .select((eb) => eb.fn.sum<number>('cm.amount').as('sum'))
         .executeTakeFirst(),
 
       orderFiltered
@@ -121,6 +135,17 @@ export const createReportsService = (db: Kysely<Database>) => ({
         .execute(),
 
       expenseFiltered
+        .leftJoin('payment_methods as pm', 'pm.id', 'e.payment_method_id')
+        .select([
+          sql<string>`COALESCE(pm.name, 'Sin método')`.as('method_name'),
+          (eb) => eb.fn.sum<number>('e.amount').as('amount'),
+          (eb) => eb.fn.count<number>('e.id').as('count')
+        ])
+        .groupBy(sql`COALESCE(pm.name, 'Sin método')`)
+        .orderBy('amount desc')
+        .execute(),
+
+      expenseFiltered
         .innerJoin('expense_categories as ec', 'ec.id', 'e.category_id')
         .select([
           'e.expense_date',
@@ -156,6 +181,14 @@ export const createReportsService = (db: Kysely<Database>) => ({
         .groupBy(sql`DATE_FORMAT(e.expense_date, '%Y-%m-%d')`)
         .execute(),
 
+      paymentOutFiltered
+        .select([
+          sql<string>`DATE_FORMAT(cm.created_at, '%Y-%m-%d')`.as('day'),
+          (eb) => eb.fn.sum<number>('cm.amount').as('amount')
+        ])
+        .groupBy(sql`DATE_FORMAT(cm.created_at, '%Y-%m-%d')`)
+        .execute(),
+
       orderFiltered
         .select([
           sql<string>`DATE_FORMAT(o.created_at, '%Y-%m-%d')`.as('day'),
@@ -166,7 +199,9 @@ export const createReportsService = (db: Kysely<Database>) => ({
     ]);
 
     const totalSales = Number(totalSalesRow?.sum ?? 0);
-    const totalExpenses = Number(totalExpensesRow?.sum ?? 0);
+    const explicitExpenses = Number(totalExpensesRow?.sum ?? 0);
+    const totalPaymentOut = Number(totalPaymentOutRow?.sum ?? 0);
+    const totalExpenses = explicitExpenses + totalPaymentOut;
 
     const salesByDay = new Map(dailySalesRows.map((row) => [row.day, Number(row.amount ?? 0)]));
     const paymentsByDay = new Map(
@@ -174,6 +209,9 @@ export const createReportsService = (db: Kysely<Database>) => ({
     );
     const expensesByDay = new Map(
       dailyExpensesRows.map((row) => [row.day, Number(row.amount ?? 0)])
+    );
+    const paymentOutByDay = new Map(
+      dailyPaymentOutRows.map((row) => [row.day, Number(row.amount ?? 0)])
     );
     const ordersByDay = new Map(dailyOrdersRows.map((row) => [row.day, Number(row.count ?? 0)]));
 
@@ -187,7 +225,7 @@ export const createReportsService = (db: Kysely<Database>) => ({
         date: day,
         sales: salesByDay.get(day) ?? 0,
         payments: paymentsByDay.get(day) ?? 0,
-        expenses: expensesByDay.get(day) ?? 0,
+        expenses: (expensesByDay.get(day) ?? 0) + (paymentOutByDay.get(day) ?? 0),
         orders: ordersByDay.get(day) ?? 0
       });
       cursor = addDays(cursor, 1);
@@ -198,6 +236,7 @@ export const createReportsService = (db: Kysely<Database>) => ({
       to: rangeTo,
       totalSales,
       totalExpenses,
+      totalPaymentOut,
       netUtility: totalSales - totalExpenses,
       totalPayments: Number(totalPaymentsRow?.sum ?? 0),
       totalOrders: Number(totalOrdersRow?.count ?? 0),
@@ -216,6 +255,11 @@ export const createReportsService = (db: Kysely<Database>) => ({
       })),
       expensesByCategory: expensesByCategory.map((item) => ({
         categoryName: item.category_name,
+        amount: Number(item.amount ?? 0),
+        count: Number(item.count ?? 0)
+      })),
+      expensesByPaymentMethod: expensesByPaymentMethod.map((item) => ({
+        methodName: item.method_name,
         amount: Number(item.amount ?? 0),
         count: Number(item.count ?? 0)
       })),

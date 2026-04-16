@@ -211,7 +211,7 @@ export interface CashSessionsTable {
 export interface CashClosuresTable { id: Generated<number>; cash_session_id: number; closed_by: number; declared_amount: number; system_amount: number; difference_amount: number; closed_at: ColumnType<Date, never, never>; }
 export interface CashSessionTotalsTable { id: Generated<number>; cash_session_id: number; payment_method_id: number; system_amount: number; counted_amount: number | null; }
 export interface CashMovementsTable { id: Generated<number>; cash_session_id: number; movement_type: string; amount: number; notes: string | null; created_by: number | null; created_at: ColumnType<Date, never, never>; }
-export interface ExpensesTable { id: Generated<number>; cash_session_id: number | null; category_id: number; amount: number; description: string; expense_date: Date; created_by: number | null; created_at: ColumnType<Date, never, never>; }
+export interface ExpensesTable { id: Generated<number>; cash_session_id: number | null; category_id: number; payment_method_id: number | null; amount: number; description: string; expense_date: Date; created_by: number | null; created_at: ColumnType<Date, never, never>; }
 export interface WarrantiesTable { id: Generated<number>; order_id: number; status_id: number; reason: string; resolution: string | null; created_at: ColumnType<Date, never, never>; }
 export interface WarrantyStatusLogsTable { id: Generated<number>; warranty_id: number; status_id: number; notes: string | null; created_by: number | null; created_at: ColumnType<Date, never, never>; }
 export interface AttachmentsTable { id: Generated<number>; entity_type: string; entity_id: number; file_name: string; file_path: string; mime_type: string | null; created_at: ColumnType<Date, never, never>; }

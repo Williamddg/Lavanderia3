@@ -112,7 +112,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
   getCashSummary: () => ipcRenderer.invoke('cash:summary'),
 
   listExpenses: () => ipcRenderer.invoke('expenses:list'),
-  createExpense: (input: { categoryId: number; amount: number; description: string; expenseDate: string }) =>
+  createExpense: (input: { categoryId: number; paymentMethodId: number; amount: number; description: string; expenseDate: string }) =>
     ipcRenderer.invoke('expenses:create', input),
   listExpenseCategories: () => ipcRenderer.invoke('expenses:categories'),
 

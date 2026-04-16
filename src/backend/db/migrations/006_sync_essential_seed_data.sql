@@ -1,5 +1,5 @@
 INSERT INTO `app_settings` (`id`, `setting_key`, `setting_value`, `created_at`, `updated_at`)
-VALUES (1,'order_protection_password','6425','2026-04-07 23:21:08','2026-04-08 00:05:12')
+VALUES (1,'order_protection_password','12345','2026-04-07 23:21:08','2026-04-08 00:05:12')
 ON DUPLICATE KEY UPDATE
   `setting_key` = VALUES(`setting_key`),
   `setting_value` = VALUES(`setting_value`),

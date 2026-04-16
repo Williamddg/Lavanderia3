@@ -381,6 +381,11 @@ export type CashCloseResult = {
     methodName: string;
     amount: number;
   }>;
+  totalExpenses?: number;
+  expensesByMethod?: Array<{
+    methodName: string;
+    amount: number;
+  }>;
   deliveredOrders?: Array<{
     orderId: number;
     orderNumber: string;
@@ -422,6 +427,8 @@ export type CashSessionSummary = {
     closedAt: string;
   } | null;
   totalsByMethod: Array<{ methodName: string; amount: number }>;
+  totalExpenses: number;
+  expensesByMethod: Array<{ methodName: string; amount: number }>;
   recentMovements: Array<{
     id: number;
     movementType: string;
@@ -429,6 +436,12 @@ export type CashSessionSummary = {
     notes: string | null;
     createdAt: string;
   }>;
+};
+
+export type GlobalSearchResult = {
+  clients: Array<Pick<Client, 'id' | 'firstName' | 'lastName' | 'phone'>>;
+  orders: Array<Pick<Order, 'id' | 'orderNumber' | 'clientName' | 'statusName' | 'total' | 'balanceDue'>>;
+  invoices: Array<Pick<Invoice, 'id' | 'invoiceNumber' | 'orderId' | 'clientName' | 'total' | 'balanceDue'>>;
 };
 
 
@@ -473,6 +486,8 @@ export type Expense = {
   cashSessionId: number | null;
   categoryId: number;
   categoryName?: string;
+  paymentMethodId: number | null;
+  paymentMethodName?: string | null;
   amount: number;
   description: string;
   expenseDate: string;
@@ -482,6 +497,7 @@ export type Expense = {
 
 export type ExpenseInput = {
   categoryId: number;
+  paymentMethodId: number;
   amount: number;
   description: string;
   expenseDate: string;
@@ -523,6 +539,7 @@ export type ReportsSummary = {
   to: string | null;
   totalSales: number;
   totalExpenses: number;
+  totalPaymentOut: number;
   netUtility: number;
   totalPayments: number;
   totalOrders: number;
@@ -541,6 +558,11 @@ export type ReportsSummary = {
   }>;
   expensesByCategory: Array<{
     categoryName: string;
+    amount: number;
+    count: number;
+  }>;
+  expensesByPaymentMethod: Array<{
+    methodName: string;
     amount: number;
     count: number;
   }>;

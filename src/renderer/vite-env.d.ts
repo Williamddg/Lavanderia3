@@ -58,6 +58,7 @@ declare global {
       listExpenses: () => Promise<unknown>;
       createExpense: (input: {
         categoryId: number;
+        paymentMethodId: number;
         amount: number;
         description: string;
         expenseDate: string;

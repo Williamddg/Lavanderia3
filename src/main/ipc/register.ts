@@ -46,6 +46,31 @@ const wrap =
   };
 
 export const registerIpc = () => {
+  const ensurePrintableFrameReady = async (webContents: Electron.WebContents) => {
+    try {
+      await webContents.executeJavaScript(
+        `
+          new Promise((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+          })
+        `,
+        true
+      );
+      await webContents.executeJavaScript(
+        `
+          (document?.fonts?.ready
+            ? document.fonts.ready.then(() => true)
+            : Promise.resolve(true))
+        `,
+        true
+      );
+    } catch {
+      // Ignorar errores de pre-render y continuar con printToPDF.
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  };
+
   ipcMain.handle(
     'license:status',
     wrap(async () => {
@@ -217,6 +242,7 @@ export const registerIpc = () => {
         return { success: true, data: { saved: false, path: null } };
       }
 
+      await ensurePrintableFrameReady(webContents);
       const pdf = await webContents.printToPDF({
         printBackground: true,
         preferCSSPageSize: true
@@ -250,6 +276,7 @@ export const registerIpc = () => {
 
         await mkdir(outputDir, { recursive: true });
 
+        await ensurePrintableFrameReady(webContents);
         const pdf = await webContents.printToPDF({
           printBackground: true,
           preferCSSPageSize: true

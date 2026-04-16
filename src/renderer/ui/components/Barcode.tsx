@@ -25,17 +25,24 @@ export const Barcode = ({
       .trim()
       .toUpperCase();
 
-    // CODE39 suele ser más tolerante para textos alfanuméricos con guiones
-    JsBarcode(svgRef.current, normalized, {
-      format: 'CODE128',
-      lineColor: '#000',
-      background: '#fff',
-      width,
-      height,
-      margin: 0,
-      displayValue,
-      fontOptions: 'bold'
-    });
+    try {
+      // CODE128 handles alphanumeric values with good scanner support.
+      JsBarcode(svgRef.current, normalized || 'SIN-CODIGO', {
+        format: 'CODE128',
+        lineColor: '#000',
+        background: '#fff',
+        width,
+        height,
+        margin: 0,
+        displayValue,
+        fontOptions: 'bold'
+      });
+    } catch {
+      // Avoid crashing the invoice page if barcode generation fails.
+      if (svgRef.current) {
+        svgRef.current.innerHTML = '';
+      }
+    }
   }, [value, width, height, displayValue]);
 
   return <svg ref={svgRef} />;

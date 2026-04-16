@@ -6,10 +6,26 @@ import { currency } from '@renderer/utils/format';
 
 export const DashboardPage = () => {
   const { data } = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboardSummary });
+  const paymentTotalToday = (data?.paymentBreakdown ?? []).reduce(
+    (sum, item) => sum + Number(item.amount ?? 0),
+    0
+  );
+  const avgRecentTicket =
+    (data?.recentOrders?.length ?? 0) > 0
+      ? (data?.recentOrders ?? []).reduce((sum, order) => sum + Number(order.total ?? 0), 0) /
+        Number(data?.recentOrders?.length ?? 1)
+      : 0;
 
   return (
     <section className="stack-gap">
       <PageHeader title="Dashboard" subtitle="Vista comercial del negocio con operación, caja y alertas del día." actions={<Link className="button button-primary" to="/ordenes/nueva">Nueva orden</Link>} />
+      <div className="row-actions">
+        <Link className="button button-secondary" to="/ordenes">Ver órdenes</Link>
+        <Link className="button button-secondary" to="/entregas">Entregas</Link>
+        <Link className="button button-secondary" to="/facturas">Facturación</Link>
+        <Link className="button button-secondary" to="/caja">Caja</Link>
+        <Link className="button button-secondary" to="/reportes">Reportes</Link>
+      </div>
       <div className="summary-grid">
         <SummaryCard title="Clientes" value={String(data?.clients ?? 0)} accent="#5a7cff" />
         <SummaryCard title="Órdenes abiertas" value={String(data?.openOrders ?? 0)} accent="#c29c6a" />
@@ -21,6 +37,12 @@ export const DashboardPage = () => {
         <SummaryCard title="Prendas en garantía" value={String(data?.openWarranties ?? 0)} accent="#e0ab55" />
         <SummaryCard title="Métodos de pago" value={String(data?.paymentBreakdown.length ?? 0)} accent="#6786a8" />
         <SummaryCard title="Órdenes recientes" value={String(data?.recentOrders.length ?? 0)} accent="#7a8a94" />
+      </div>
+      <div className="summary-grid">
+        <SummaryCard title="Pagos del día" value={currency(paymentTotalToday)} accent="#3b82f6" />
+        <SummaryCard title="Ticket prom. (recientes)" value={currency(avgRecentTicket)} accent="#0ea5a4" />
+        <SummaryCard title="Órdenes con saldo" value={String((data?.recentOrders ?? []).filter((o) => Number(o.balanceDue ?? 0) > 0).length)} accent="#f97316" />
+        <SummaryCard title="Órdenes al día" value={String((data?.recentOrders ?? []).filter((o) => Number(o.balanceDue ?? 0) <= 0).length)} accent="#16a34a" />
       </div>
       <div className="split-grid">
         <div className="card-panel">
