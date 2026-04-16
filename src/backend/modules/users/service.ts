@@ -2,12 +2,22 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
-import type { SellerUser, SellerUserUpdateInput } from '../../../shared/types.js';
+import type {
+  SellerUser,
+  SellerUserCreateInput,
+  SellerUserUpdateInput
+} from '../../../shared/types.js';
 
 const updateSchema = z.object({
   fullName: z.string().trim().min(3),
   username: z.string().trim().min(3),
   password: z.string().trim().min(3).nullable().optional()
+});
+
+const createSchema = z.object({
+  fullName: z.string().trim().min(3),
+  username: z.string().trim().min(3),
+  password: z.string().trim().min(3)
 });
 
 const mapSeller = (row: any): SellerUser => ({
@@ -97,5 +107,96 @@ export const createUsersService = (db: Kysely<Database>) => ({
       .executeTakeFirstOrThrow();
 
     return mapSeller(updated);
+  },
+
+  async createSeller(input: SellerUserCreateInput): Promise<SellerUser> {
+    const parsed = createSchema.parse(input);
+
+    const existingUsername = await db
+      .selectFrom('users')
+      .select('id')
+      .where('username', '=', parsed.username)
+      .executeTakeFirst();
+
+    if (existingUsername) {
+      throw new Error('Ese nombre de usuario ya está en uso.');
+    }
+
+    const sellerRole = await db
+      .selectFrom('roles')
+      .select(['id', 'name'])
+      .where('name', 'in', ['Vendedor', 'vendedor', 'Seller'])
+      .orderBy('id')
+      .executeTakeFirst();
+
+    const roleId = Number(sellerRole?.id ?? 2);
+
+    const inserted = await db
+      .insertInto('users')
+      .values({
+        branch_id: null,
+        role_id: roleId,
+        username: parsed.username,
+        password_hash: await bcrypt.hash(parsed.password, 10),
+        full_name: parsed.fullName,
+        is_active: 1
+      })
+      .executeTakeFirstOrThrow();
+
+    await db
+      .insertInto('audit_logs')
+      .values({
+        action: 'USER_CREATE',
+        entity_type: 'user',
+        entity_id: String(inserted.insertId),
+        details_json: JSON.stringify({
+          fullName: parsed.fullName,
+          username: parsed.username,
+          roleId
+        })
+      })
+      .execute();
+
+    const created = await db
+      .selectFrom('users')
+      .select(['id', 'full_name', 'username'])
+      .where('id', '=', Number(inserted.insertId))
+      .executeTakeFirstOrThrow();
+
+    return mapSeller(created);
+  },
+
+  async removeSeller(id: number): Promise<{ success: true }> {
+    const target = await db
+      .selectFrom('users')
+      .select(['id', 'role_id'])
+      .where('id', '=', id)
+      .executeTakeFirst();
+
+    if (!target) {
+      throw new Error('Usuario no encontrado.');
+    }
+
+    if (Number(target.role_id) === 1) {
+      throw new Error('No se puede eliminar un administrador desde este módulo.');
+    }
+
+    await db
+      .updateTable('users')
+      .set({ is_active: 0 })
+      .where('id', '=', id)
+      .execute();
+
+    await db
+      .insertInto('audit_logs')
+      .values({
+        action: 'USER_DELETE',
+        entity_type: 'user',
+        entity_id: String(id),
+        details_json: JSON.stringify({ softDelete: true })
+      })
+      .execute();
+
+    return { success: true };
   }
 });

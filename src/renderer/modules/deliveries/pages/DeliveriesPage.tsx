@@ -25,14 +25,10 @@ const getOrderSequence = (orderNumber?: string | null) => {
 
 const normalizeSearch = (value: string) => {
   const raw = String(value ?? '').trim().toUpperCase();
-
   if (!raw) return '';
-
   if (/^\d+$/.test(raw)) return String(Number(raw));
-
   const match = raw.match(/ORD-(\d+)/);
   if (match) return String(Number(match[1]));
-
   return raw;
 };
 
@@ -70,35 +66,19 @@ export const DeliveriesPage = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const { data: deliveries = [] } = useQuery({
-    queryKey: ['deliveries'],
-    queryFn: api.listDeliveries
-  });
-
-  const { data: orders = [] } = useQuery({
-    queryKey: ['orders'],
-    queryFn: api.listOrders
-  });
-  const { data: clients = [] } = useQuery({
-    queryKey: ['clients'],
-    queryFn: api.listClients
-  });
+  const { data: deliveries = [] } = useQuery({ queryKey: ['deliveries'], queryFn: api.listDeliveries });
+  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: api.listOrders });
+  const { data: clients = [] } = useQuery({ queryKey: ['clients'], queryFn: api.listClients });
   const { data: pdfOutputDir } = useQuery({
     queryKey: ['pdf-output-dir'],
     queryFn: async () => {
-      try {
-        return await api.getPdfOutputDir();
-      } catch {
-        return null;
-      }
+      try { return await api.getPdfOutputDir(); } catch { return null; }
     }
   });
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<DeliveryInput>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
-
-  const [orderFilter, setOrderFilter] = useState('');
   const [modalOrderFilter, setModalOrderFilter] = useState('');
   const [exportMode, setExportMode] = useState<'due-today' | 'ready' | 'active-all' | null>(null);
 
@@ -144,18 +124,11 @@ export const DeliveriesPage = () => {
     return client?.phone ?? null;
   };
 
-  // 🔥 AUTO ABRIR DESDE ORDEN
   useEffect(() => {
     if (!shouldOpenFromOrder || !requestedOrderId || !deliverableOrders.length) return;
-
-    const selectedOrder = deliverableOrders.find(
-      (order) => order.id === requestedOrderId
-    );
-
+    const selectedOrder = deliverableOrders.find((order) => order.id === requestedOrderId);
     if (!selectedOrder) return;
-
     setOpen(true);
-
     setForm((prev) => ({
       ...prev,
       orderId: selectedOrder.id,
@@ -163,79 +136,42 @@ export const DeliveriesPage = () => {
       deliveredTo: selectedOrder.clientName ?? '',
       receiverPhone: getOrderClientPhone(selectedOrder.id)
     }));
-
     setModalOrderFilter(selectedOrder.orderNumber);
     setFormError(null);
-
     setSearchParams({}, { replace: true });
-  }, [
-    shouldOpenFromOrder,
-    requestedOrderId,
-    deliverableOrders,
-    clients,
-    setSearchParams
-  ]);
+  }, [shouldOpenFromOrder, requestedOrderId, deliverableOrders, clients, setSearchParams]);
 
   const filteredDeliverableOrders = useMemo(() => {
     const raw = modalOrderFilter.trim();
     if (!raw) return deliverableOrders;
-
     const term = normalizeSearch(raw);
-
     return deliverableOrders.filter((order) => {
       const orderNumber = String(order.orderNumber ?? '').toUpperCase();
       const clientName = String(order.clientName ?? '').toLowerCase();
       const sequence = getOrderSequence(order.orderNumber);
-
       if (/^\d+$/.test(raw)) return sequence === term;
       if (/^ORD-\d+$/i.test(raw)) return orderNumber === raw.toUpperCase();
-
-      return (
-        orderNumber.includes(raw.toUpperCase()) ||
-        clientName.includes(raw.toLowerCase())
-      );
+      return orderNumber.includes(raw.toUpperCase()) || clientName.includes(raw.toLowerCase());
     });
   }, [deliverableOrders, modalOrderFilter]);
 
-  // 🔥 VALIDACIÓN NEGOCIO
   const validateOrder = () => {
     const selected = orders.find((o) => o.id === form.orderId);
-
     if (!selected) return 'Debes seleccionar una orden válida.';
-
     const statusCode = String(selected.statusCode ?? '').toUpperCase();
     const statusName = String(selected.statusName ?? '').toUpperCase();
-
     if (!['READY', 'READY_FOR_DELIVERY'].includes(statusCode) && !statusName.includes('LISTO')) {
       return 'La orden no está lista para entrega. Debes cambiar el estado a "LISTO PARA ENTREGAR".';
     }
-
     if (Number(selected.balanceDue ?? 0) > 0) {
-      return `La orden tiene saldo pendiente (${currency(
-        selected.balanceDue
-      )}). Debes registrar el pago antes de entregarla.`;
+      return `La orden tiene saldo pendiente (${currency(selected.balanceDue)}). Debes registrar el pago antes de entregarla.`;
     }
-
     return null;
   };
 
-  const filteredDeliveries = useMemo(() => {
-    const filter = orderFilter.trim().toLowerCase();
-    if (!filter) return deliveries;
-
-    return deliveries.filter((delivery) => {
-      const relatedOrder = orders.find((order) => order.id === delivery.orderId);
-      const orderNumber = relatedOrder?.orderNumber?.toLowerCase() ?? '';
-      const orderIdText = String(delivery.orderId).toLowerCase();
-
-      return orderNumber.includes(filter) || orderIdText.includes(filter);
-    });
-  }, [deliveries, orders, orderFilter]);
-
   const deliveredTodayRows = useMemo(
-    () =>
-      filteredDeliveries.filter((delivery) => normalizeDateKey(delivery.createdAt) === todayKey),
-    [filteredDeliveries]
+    () => deliveries.filter((delivery) => normalizeDateKey(delivery.createdAt) === todayKey),
+    [deliveries]
   );
 
   const shouldDeliverTodayRows = useMemo(() => {
@@ -273,10 +209,7 @@ export const DeliveriesPage = () => {
     });
   }, [orders]);
 
-  const exportSectionToPdf = async (
-    mode: 'due-today' | 'ready' | 'active-all',
-    fileName: string
-  ) => {
+  const exportSectionToPdf = async (mode: 'due-today' | 'ready' | 'active-all', fileName: string) => {
     setExportMode(mode);
     await new Promise((resolve) => window.setTimeout(resolve, 60));
     try {
@@ -295,28 +228,17 @@ export const DeliveriesPage = () => {
     companyName: string,
     generatedAt: string,
     summary: { orders: number; totalItems: number },
-    rows: Array<{
-      orderNumber: string;
-      clientName: string;
-      dueDate: string | null;
-      statusName: string;
-      itemsCount?: number;
-    }>
+    rows: Array<{ orderNumber: string; clientName: string; dueDate: string | null; statusName: string; itemsCount?: number }>
   ) => {
     const body = rows.length
-      ? rows
-          .map(
-            (row, idx) => `
-              <div class="item">
-              <div><strong>${idx + 1}. ${row.orderNumber}</strong></div>
-              <div>${row.clientName}</div>
-              <div>Prendas: ${Number(row.itemsCount ?? 0)}</div>
-              <div>Estado: ${row.statusName}</div>
-              <div>Fecha promesa: ${row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-CO') : '—'}</div>
-              </div>
-            `
-          )
-          .join('')
+      ? rows.map((row, idx) => `
+          <div class="item">
+            <div><strong>${idx + 1}. ${row.orderNumber}</strong></div>
+            <div>${row.clientName}</div>
+            <div>Prendas: ${Number(row.itemsCount ?? 0)}</div>
+            <div>Estado: ${row.statusName}</div>
+            <div>Fecha promesa: ${row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-CO') : '—'}</div>
+          </div>`).join('')
       : '<div class="item">Sin órdenes.</div>';
 
     return `<!doctype html>
@@ -326,13 +248,13 @@ export const DeliveriesPage = () => {
         <title>${title}</title>
         <style>
           @page { size: 80mm auto; margin: 2mm; }
-      body { font-family: monospace; color: #000; margin: 0; padding: 0; width: 76mm; font-size: 11px; }
-      .wrap { padding: 2mm; }
-      h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
-      .meta { margin: 0 0 6px; font-size: 10px; color: #333; }
-      .item { border-top: 1px dashed #000; padding: 6px 0; }
-      .resume { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 8px 0; }
-      .resume div { display: flex; justify-content: space-between; gap: 8px; }
+          body { font-family: monospace; color: #000; margin: 0; padding: 0; width: 76mm; font-size: 11px; }
+          .wrap { padding: 2mm; }
+          h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
+          .meta { margin: 0 0 6px; font-size: 10px; color: #333; }
+          .item { border-top: 1px dashed #000; padding: 6px 0; }
+          .resume { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 8px 0; }
+          .resume div { display: flex; justify-content: space-between; gap: 8px; }
         </style>
       </head>
       <body>
@@ -352,12 +274,7 @@ export const DeliveriesPage = () => {
 
   const printThermalList = async (
     title: string,
-    rows: Array<{
-      orderNumber: string;
-      clientName: string;
-      dueDate: string | null;
-      statusName: string;
-    }>
+    rows: Array<{ orderNumber: string; clientName: string; dueDate: string | null; statusName: string }>
   ) => {
     const company = await api.companySettings().catch(() => null);
     const generatedAt = new Date().toLocaleString('es-CO');
@@ -367,59 +284,28 @@ export const DeliveriesPage = () => {
         if (!order) return { ...row, itemsCount: 0 };
         const detail = await api.orderDetail(order.id).catch(() => null);
         const itemsCount = (detail?.items ?? []).reduce(
-          (sum, item) => sum + Number(item.quantity ?? 0),
-          0
+          (sum, item) => sum + Number(item.quantity ?? 0), 0
         );
         return { ...row, itemsCount };
       })
     );
-
     const summary = enriched.reduce(
-      (acc, row) => {
-        acc.orders += 1;
-        acc.totalItems += Number(row.itemsCount ?? 0);
-        return acc;
-      },
+      (acc, row) => { acc.orders += 1; acc.totalItems += Number(row.itemsCount ?? 0); return acc; },
       { orders: 0, totalItems: 0 }
     );
-
     const win = window.open('', '_blank', 'width=430,height=900');
     if (!win) return;
     win.document.open();
-    win.document.write(
-      buildThermalListHtml(
-        title,
-        company?.companyName ?? 'Lavandería',
-        generatedAt,
-        summary,
-        enriched
-      )
-    );
+    win.document.write(buildThermalListHtml(title, company?.companyName ?? 'Lavandería', generatedAt, summary, enriched));
     win.document.close();
-    win.onload = () => {
-      win.focus();
-      win.print();
-    };
+    win.onload = () => { win.focus(); win.print(); };
   };
 
   const handleSubmit = () => {
-    if (!form.orderId) {
-      setFormError('Debes seleccionar una orden.');
-      return;
-    }
-
-    if (!form.deliveredTo.trim()) {
-      setFormError('Debes ingresar el nombre de quien recibe.');
-      return;
-    }
-
+    if (!form.orderId) { setFormError('Debes seleccionar una orden.'); return; }
+    if (!form.deliveredTo.trim()) { setFormError('Debes ingresar el nombre de quien recibe.'); return; }
     const validationError = validateOrder();
-
-    if (validationError) {
-      setFormError(validationError);
-      return;
-    }
-
+    if (validationError) { setFormError(validationError); return; }
     setFormError(null);
     mutation.mutate(form);
   };
@@ -463,45 +349,7 @@ export const DeliveriesPage = () => {
         }
       />
 
-      <div className="card-panel stack-gap">
-        <Input
-          placeholder="Filtrar por número de orden"
-          value={orderFilter}
-          onChange={(e) => setOrderFilter(e.target.value)}
-        />
-
-        <DataTable
-          rows={filteredDeliveries}
-          columns={[
-            {
-              key: 'order',
-              header: 'Orden',
-              render: (row) => getOrderDisplay(row.orderId)
-            },
-            {
-              key: 'who',
-              header: 'Recibe',
-              render: (row) => row.deliveredTo
-            },
-            {
-              key: 'ticket',
-              header: 'Ticket',
-              render: (row) => row.ticketCode || '—'
-            },
-            {
-              key: 'balance',
-              header: 'Saldo entregado',
-              render: (row) => currency(row.outstandingBalance)
-            },
-            {
-              key: 'date',
-              header: 'Fecha',
-              render: (row) => dateTime(row.createdAt)
-            }
-          ]}
-        />
-      </div>
-
+      {/* 1. Prometidas para hoy (aún en proceso) */}
       <div
         className="card-panel stack-gap"
         style={{ display: exportMode && exportMode !== 'due-today' ? 'none' : 'block' }}
@@ -514,23 +362,14 @@ export const DeliveriesPage = () => {
             </p>
           </div>
           <div className="row-actions no-print">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => exportSectionToPdf('due-today', `Entregas-hoy-pendientes-${todayKey}.pdf`)}
-            >
+            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('due-today', `Entregas-hoy-pendientes-${todayKey}.pdf`)}>
               Exportar PDF
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => printThermalList('Órdenes pendientes para hoy', shouldDeliverTodayRows)}
-            >
+            <Button type="button" variant="secondary" onClick={() => printThermalList('Órdenes pendientes para hoy', shouldDeliverTodayRows)}>
               Imprimir
             </Button>
           </div>
         </div>
-
         <DataTable
           rows={shouldDeliverTodayRows}
           columns={[
@@ -544,6 +383,7 @@ export const DeliveriesPage = () => {
         />
       </div>
 
+      {/* 2. Listas para entregar */}
       <div
         className="card-panel stack-gap"
         style={{ display: exportMode && exportMode !== 'ready' ? 'none' : 'block' }}
@@ -556,80 +396,27 @@ export const DeliveriesPage = () => {
             </p>
           </div>
           <div className="row-actions no-print">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => exportSectionToPdf('ready', `Ordenes-listas-para-entregar-${todayKey}.pdf`)}
-            >
+            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('ready', `Ordenes-listas-para-entregar-${todayKey}.pdf`)}>
               Exportar PDF
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => printThermalList('Órdenes listas para entregar', readyForDeliveryRows)}
-            >
+            <Button type="button" variant="secondary" onClick={() => printThermalList('Órdenes listas para entregar', readyForDeliveryRows)}>
               Imprimir
             </Button>
           </div>
         </div>
-
         <DataTable
           rows={readyForDeliveryRows}
           columns={[
             { key: 'order', header: 'Orden', render: (row) => row.orderNumber },
             { key: 'client', header: 'Cliente', render: (row) => row.clientName },
-            {
-              key: 'due',
-              header: 'Fecha promesa',
-              render: (row) => (row.dueDate ? dateTime(row.dueDate) : '—')
-            },
+            { key: 'due', header: 'Fecha promesa', render: (row) => (row.dueDate ? dateTime(row.dueDate) : '—') },
             { key: 'total', header: 'Total', render: (row) => currency(row.total) },
             { key: 'balance', header: 'Saldo', render: (row) => currency(row.balanceDue) }
           ]}
         />
       </div>
 
-      <div
-        className="card-panel stack-gap"
-        style={{ display: exportMode && exportMode !== 'active-all' ? 'none' : 'block' }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <h3 style={{ margin: 0 }}>Órdenes activas en lavandería</h3>
-          <div className="row-actions no-print">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => exportSectionToPdf('active-all', `Ordenes-activas-${todayKey}.pdf`)}
-            >
-              Exportar PDF
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => printThermalList('Órdenes activas en lavandería', activeOrdersRows)}
-            >
-              Imprimir
-            </Button>
-          </div>
-        </div>
-
-        <DataTable
-          rows={activeOrdersRows}
-          columns={[
-            { key: 'order', header: 'Orden', render: (row) => row.orderNumber },
-            { key: 'client', header: 'Cliente', render: (row) => row.clientName },
-            { key: 'status', header: 'Estado', render: (row) => row.statusName },
-            {
-              key: 'due',
-              header: 'Fecha promesa',
-              render: (row) => (row.dueDate ? dateTime(row.dueDate) : '—')
-            },
-            { key: 'total', header: 'Total', render: (row) => currency(row.total) },
-            { key: 'balance', header: 'Saldo', render: (row) => currency(row.balanceDue) }
-          ]}
-        />
-      </div>
-
+      {/* 3. Entregadas hoy */}
       <div className="card-panel stack-gap">
         <div className="stack-gap" style={{ gap: 4 }}>
           <h3 style={{ margin: 0 }}>Órdenes entregadas hoy</h3>
@@ -640,34 +427,47 @@ export const DeliveriesPage = () => {
         <DataTable
           rows={deliveredTodayRows}
           columns={[
-            {
-              key: 'order',
-              header: 'Orden',
-              render: (row) => getOrderDisplay(row.orderId)
-            },
-            {
-              key: 'who',
-              header: 'Recibe',
-              render: (row) => row.deliveredTo
-            },
-            {
-              key: 'date',
-              header: 'Hora',
-              render: (row) => dateTime(row.createdAt)
-            }
+            { key: 'order', header: 'Orden', render: (row) => getOrderDisplay(row.orderId) },
+            { key: 'who', header: 'Recibe', render: (row) => row.deliveredTo },
+            { key: 'date', header: 'Hora', render: (row) => dateTime(row.createdAt) }
+          ]}
+        />
+      </div>
+
+      {/* 4. Activas en lavandería — al final */}
+      <div
+        className="card-panel stack-gap"
+        style={{ display: exportMode && exportMode !== 'active-all' ? 'none' : 'block' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0 }}>Órdenes activas en lavandería</h3>
+          <div className="row-actions no-print">
+            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('active-all', `Ordenes-activas-${todayKey}.pdf`)}>
+              Exportar PDF
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => printThermalList('Órdenes activas en lavandería', activeOrdersRows)}>
+              Imprimir
+            </Button>
+          </div>
+        </div>
+        <DataTable
+          rows={activeOrdersRows}
+          columns={[
+            { key: 'order', header: 'Orden', render: (row) => row.orderNumber },
+            { key: 'client', header: 'Cliente', render: (row) => row.clientName },
+            { key: 'status', header: 'Estado', render: (row) => row.statusName },
+            { key: 'due', header: 'Fecha promesa', render: (row) => (row.dueDate ? dateTime(row.dueDate) : '—') },
+            { key: 'total', header: 'Total', render: (row) => currency(row.total) },
+            { key: 'balance', header: 'Saldo', render: (row) => currency(row.balanceDue) }
           ]}
         />
       </div>
 
       <Modal open={open} title="Confirmar entrega" onClose={() => setOpen(false)}>
         <div className="stack-gap">
-
           <label>
             <span>Buscar orden</span>
-            <Input
-              value={modalOrderFilter}
-              onChange={(e) => setModalOrderFilter(e.target.value)}
-            />
+            <Input value={modalOrderFilter} onChange={(e) => setModalOrderFilter(e.target.value)} />
           </label>
 
           <label>
@@ -678,7 +478,6 @@ export const DeliveriesPage = () => {
               onChange={(e) => {
                 const selectedId = Number(e.target.value);
                 const selectedOrder = deliverableOrders.find((o) => o.id === selectedId);
-
                 setForm((prev) => ({
                   ...prev,
                   orderId: selectedId,
@@ -686,7 +485,6 @@ export const DeliveriesPage = () => {
                   deliveredTo: selectedOrder?.clientName ?? prev.deliveredTo,
                   receiverPhone: getOrderClientPhone(selectedId)
                 }));
-
                 setModalOrderFilter(selectedOrder?.orderNumber ?? '');
               }}
             >
@@ -703,33 +501,20 @@ export const DeliveriesPage = () => {
             <span>Nombre receptor *</span>
             <Input
               value={form.deliveredTo}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  deliveredTo: e.target.value
-                }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, deliveredTo: e.target.value }))}
             />
           </label>
 
-          {/* 🔥 TELÉFONO OPCIONAL */}
           <label>
             <span>Teléfono (opcional)</span>
             <Input
               value={form.receiverPhone ?? ''}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  receiverPhone: e.target.value || null
-                }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, receiverPhone: e.target.value || null }))}
             />
           </label>
 
           <div className="form-actions">
-            <Button variant="secondary" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
+            <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit}>Confirmar entrega</Button>
           </div>
 

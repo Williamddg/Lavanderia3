@@ -355,6 +355,13 @@ export const createCashService = (db: Kysely<Database>) => ({
       };
     }
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const periodStart =
+      new Date(active.opened_at).getTime() > todayStart.getTime()
+        ? new Date(active.opened_at)
+        : todayStart;
+
     const totalsByMethod = await db
       .selectFrom('payments as p')
       .innerJoin('payment_methods as pm', 'pm.id', 'p.payment_method_id')
@@ -362,7 +369,7 @@ export const createCashService = (db: Kysely<Database>) => ({
         sql<string>`pm.name`.as('method_name'),
         (eb) => eb.fn.sum<number>('p.amount').as('amount')
       ])
-      .where('p.created_at', '>=', active.opened_at)
+      .where('p.created_at', '>=', periodStart)
       .groupBy('pm.name')
       .execute();
 
@@ -374,7 +381,7 @@ export const createCashService = (db: Kysely<Database>) => ({
         (eb) => eb.fn.sum<number>('e.amount').as('amount')
       ])
       .where('e.cash_session_id', '=', active.id)
-      .where('e.created_at', '>=', active.opened_at)
+      .where('e.created_at', '>=', periodStart)
       .groupBy(sql`COALESCE(pm.name, 'Sin método')`)
       .execute();
 
@@ -382,6 +389,7 @@ export const createCashService = (db: Kysely<Database>) => ({
       .selectFrom('cash_movements')
       .selectAll()
       .where('cash_session_id', '=', active.id)
+      .where('created_at', '>=', periodStart)
       .orderBy('id desc')
       .limit(10)
       .execute();
@@ -393,7 +401,7 @@ export const createCashService = (db: Kysely<Database>) => ({
         (eb) => eb.fn.sum<number>('amount').as('amount')
       ])
       .where('cash_session_id', '=', active.id)
-      .where('created_at', '>=', active.opened_at)
+      .where('created_at', '>=', periodStart)
       .groupBy('movement_type')
       .execute();
 

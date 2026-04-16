@@ -458,6 +458,12 @@ export type SellerUserUpdateInput = {
   password?: string | null;
 };
 
+export type SellerUserCreateInput = {
+  fullName: string;
+  username: string;
+  password: string;
+};
+
 
 export type DashboardSummary = {
   clients: number;

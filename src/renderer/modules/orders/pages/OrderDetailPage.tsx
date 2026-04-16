@@ -34,7 +34,7 @@ const getValidNextStatuses = (
   });
 };
 
-const tabs = ['Resumen', 'Prendas', 'Pagos', 'Facturas', 'Entregas'] as const;
+const tabs = ['Resumen', 'Pagos', 'Facturas', 'Entregas'] as const;
 
 const renderValue = (value?: string | null) => {
   const text = String(value ?? '').trim();
@@ -335,119 +335,6 @@ export const OrderDetailPage = () => {
     if (!data) return null;
 
     switch (activeTab) {
-      case 'Prendas':
-        return (
-          <div className="stack-gap">
-            {data.items.map((item, index) => (
-              <div key={item.id} className="card-panel stack-gap">
-                <div className="detail-grid">
-                  <div className="stack-gap">
-                    <div className="detail-row">
-                      <span>Prenda</span>
-                      <strong>{item.description}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Cantidad</span>
-                      <strong>{item.quantity}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Precio unitario</span>
-                      <strong>{currency(item.unitPrice)}</strong>
-                    </div>
-                    {Number(item.discountAmount) > 0 && (
-                      <div className="detail-row">
-                        <span>Descuento</span>
-                        <strong style={{ color: '#16a34a' }}>- {currency(item.discountAmount)}</strong>
-                      </div>
-                    )}
-                    {item.discountReason && (
-                      <div className="detail-row">
-                        <span>Razón descuento</span>
-                        <strong>{item.discountReason}</strong>
-                      </div>
-                    )}
-                    {Number(item.surchargeAmount) > 0 && (
-                      <div className="detail-row">
-                        <span>Recargo</span>
-                        <strong style={{ color: '#dc2626' }}>+ {currency(item.surchargeAmount)}</strong>
-                      </div>
-                    )}
-                    {item.surchargeReason && (
-                      <div className="detail-row">
-                        <span>Razón recargo</span>
-                        <strong>{item.surchargeReason}</strong>
-                      </div>
-                    )}
-                    <div className="detail-row">
-                      <span>Total</span>
-                      <strong>{currency(item.total)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="stack-gap">
-                    <div className="detail-row">
-                      <span>Color</span>
-                      <strong>{renderValue(item.color)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Marca</span>
-                      <strong>{renderValue(item.brand)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Talla / referencia</span>
-                      <strong>{renderValue(item.sizeReference)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Material</span>
-                      <strong>{renderValue(item.material)}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="detail-grid">
-                  <div className="stack-gap">
-                    <div className="detail-row">
-                      <span>Condición al recibir</span>
-                      <strong>{renderValue(item.receivedCondition)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Detalle del trabajo</span>
-                      <strong>{renderValue(item.workDetail)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Manchas</span>
-                      <strong>{renderValue(item.stains)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Daños</span>
-                      <strong>{renderValue(item.damages)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="stack-gap">
-                    <div className="detail-row">
-                      <span>Accesorios faltantes</span>
-                      <strong>{renderValue(item.missingAccessories)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Obs. cliente</span>
-                      <strong>{renderValue(item.customerObservations)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Obs. internas</span>
-                      <strong>{renderValue(item.internalObservations)}</strong>
-                    </div>
-                    <div className="detail-row">
-                      <span>Ítem</span>
-                      <strong>#{index + 1}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-
       case 'Pagos':
         return (
           <DataTable
@@ -687,7 +574,11 @@ export const OrderDetailPage = () => {
       Registrar pago
     </Button>
 
-    <Link className="button button-secondary" to={`/facturas/${data.id}`}>
+    <Link
+      className="button"
+      style={{ background: '#7c3aed', color: '#fff', border: 'none' }}
+      to={`/facturas/${data.id}`}
+    >
       Generar factura
     </Link>
 

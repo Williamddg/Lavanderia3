@@ -42,6 +42,7 @@ import type {
   SetupInitializeSchemaResult,
   SetupRootConnectionInput,
   SellerUser,
+  SellerUserCreateInput,
   SellerUserUpdateInput,
 } from '@shared/types';
 
@@ -177,8 +178,12 @@ export const api = {
   createDelivery: (input: DeliveryInput) => unwrap<DeliveryRecord>(window.desktopApi.createDelivery(input)),
 
   listSellerUsers: () => unwrap<SellerUser[]>(window.desktopApi.listSellerUsers()),
+  createSellerUser: (input: SellerUserCreateInput) =>
+    unwrap<SellerUser>(window.desktopApi.createSellerUser(input)),
   updateSellerUser: (id: number, input: SellerUserUpdateInput) =>
     unwrap<SellerUser>(window.desktopApi.updateSellerUser(id, input)),
+  deleteSellerUser: (id: number) =>
+    unwrap<{ success: true }>(window.desktopApi.deleteSellerUser(id)),
 
   dashboardSummary: () => unwrap<DashboardSummary>(window.desktopApi.getDashboardSummary()),
 

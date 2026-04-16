@@ -17,6 +17,11 @@ export const UsersPage = () => {
   });
   const [editing, setEditing] = useState<Record<number, RowState>>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [createForm, setCreateForm] = useState<RowState>({
+    fullName: '',
+    username: '',
+    password: ''
+  });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: RowState }) =>
@@ -34,6 +39,23 @@ export const UsersPage = () => {
           password: ''
         }
       }));
+      await queryClient.invalidateQueries({ queryKey: ['seller-users'] });
+    }
+  });
+
+  const createMutation = useMutation({
+    mutationFn: api.createSellerUser,
+    onSuccess: async () => {
+      setMessage('Vendedor creado correctamente.');
+      setCreateForm({ fullName: '', username: '', password: '' });
+      await queryClient.invalidateQueries({ queryKey: ['seller-users'] });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: api.deleteSellerUser,
+    onSuccess: async () => {
+      setMessage('Vendedor eliminado.');
       await queryClient.invalidateQueries({ queryKey: ['seller-users'] });
     }
   });
@@ -57,6 +79,55 @@ export const UsersPage = () => {
         title="Usuarios"
         subtitle="Gestión de vendedores: nombre, usuario y cambio de contraseña."
       />
+
+      <div className="card-panel stack-gap">
+        <h3 style={{ margin: 0 }}>Crear vendedor</h3>
+        <div className="form-grid">
+          <label>
+            <span>Nombre completo</span>
+            <Input
+              value={createForm.fullName}
+              onChange={(e) =>
+                setCreateForm((prev) => ({ ...prev, fullName: e.target.value }))
+              }
+            />
+          </label>
+          <label>
+            <span>Usuario</span>
+            <Input
+              value={createForm.username}
+              onChange={(e) =>
+                setCreateForm((prev) => ({ ...prev, username: e.target.value }))
+              }
+            />
+          </label>
+          <label className="full-span">
+            <span>Contraseña</span>
+            <Input
+              type="password"
+              value={createForm.password}
+              onChange={(e) =>
+                setCreateForm((prev) => ({ ...prev, password: e.target.value }))
+              }
+            />
+          </label>
+        </div>
+        <div className="form-actions">
+          <Button
+            onClick={() => {
+              setMessage(null);
+              createMutation.mutate({
+                fullName: createForm.fullName,
+                username: createForm.username,
+                password: createForm.password
+              });
+            }}
+            disabled={createMutation.isPending}
+          >
+            Crear vendedor
+          </Button>
+        </div>
+      </div>
 
       <div className="card-panel stack-gap">
         <DataTable
@@ -113,22 +184,40 @@ export const UsersPage = () => {
               key: 'actions',
               header: 'Acción',
               render: (row) => (
-                <Button
-                  onClick={() => {
-                    setMessage(null);
-                    updateMutation.mutate({ id: row.id, input: row.draft });
-                  }}
-                  disabled={updateMutation.isPending}
-                >
-                  Guardar
-                </Button>
+                <div className="row-actions">
+                  <Button
+                    onClick={() => {
+                      setMessage(null);
+                      updateMutation.mutate({ id: row.id, input: row.draft });
+                    }}
+                    disabled={updateMutation.isPending}
+                  >
+                    Guardar
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setMessage(null);
+                      deleteMutation.mutate(row.id);
+                    }}
+                    disabled={deleteMutation.isPending}
+                  >
+                    Eliminar
+                  </Button>
+                </div>
               )
             }
           ]}
         />
 
+        {createMutation.isError && (
+          <p className="error-text">{(createMutation.error as Error).message}</p>
+        )}
         {updateMutation.isError && (
           <p className="error-text">{(updateMutation.error as Error).message}</p>
+        )}
+        {deleteMutation.isError && (
+          <p className="error-text">{(deleteMutation.error as Error).message}</p>
         )}
         {message && <p style={{ color: '#16a34a', margin: 0 }}>{message}</p>}
       </div>

@@ -119,8 +119,11 @@ contextBridge.exposeInMainWorld('desktopApi', {
   listExpenseCategories: () => ipcRenderer.invoke('expenses:categories'),
 
   listSellerUsers: () => ipcRenderer.invoke('users:list-sellers'),
+  createSellerUser: (input: { fullName: string; username: string; password: string }) =>
+    ipcRenderer.invoke('users:create-seller', input),
   updateSellerUser: (id: number, input: { fullName: string; username: string; password?: string | null }) =>
     ipcRenderer.invoke('users:update-seller', id, input),
+  deleteSellerUser: (id: number) => ipcRenderer.invoke('users:delete-seller', id),
 
   listDeliveries: () => ipcRenderer.invoke('deliveries:list'),
   createDelivery: (input: DeliveryInput) => ipcRenderer.invoke('deliveries:create', input),

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { api } from '@renderer/services/api';
 import type { SessionUser } from '@shared/types';
 
-
 type Props = {
   onLogin: (user: SessionUser) => void;
 };
@@ -40,6 +39,48 @@ export const LoginPage = ({ onLogin }: Props) => {
       <div className="auth-backdrop" />
 
       <div className="auth-layout">
+
+        {/* Botón cerrar — esquina superior derecha de toda la pantalla */}
+        <button
+          type="button"
+          onClick={() => api.quitApp()}
+          title="Cerrar aplicación"
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '7px 14px',
+            background: 'rgba(0,0,0,0.18)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 8,
+            color: 'rgba(255,255,255,0.75)',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            backdropFilter: 'blur(4px)',
+            transition: 'background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(220,50,50,0.75)';
+            (e.currentTarget as HTMLButtonElement).style.color = '#fff';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(220,50,50,0.4)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,0,0,0.18)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.75)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)';
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1L12 12M12 1L1 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+          Cerrar app
+        </button>
+
         <div className="auth-brand-panel">
           <div className="auth-brand-badge">LavaSuite</div>
 
@@ -125,23 +166,8 @@ export const LoginPage = ({ onLogin }: Props) => {
               </button>
             </form>
 
-            <div className="auth-footer-note" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>SISTETECNI Textile suite</span>
-              <button
-                type="button"
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 6,
-                  padding: '4px 12px',
-                  fontSize: 12,
-                  color: '#6b7280',
-                  cursor: 'pointer'
-                }}
-                onClick={() => api.quitApp()}
-              >
-                Cerrar app
-              </button>
+            <div className="auth-footer-note">
+              <span>Desarrollado por SISTETECNI</span>
             </div>
           </div>
         </div>

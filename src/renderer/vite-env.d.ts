@@ -65,10 +65,16 @@ declare global {
       }) => Promise<unknown>;
       listExpenseCategories: () => Promise<unknown>;
       listSellerUsers: () => Promise<unknown>;
+      createSellerUser: (input: {
+        fullName: string;
+        username: string;
+        password: string;
+      }) => Promise<unknown>;
       updateSellerUser: (
         id: number,
         input: { fullName: string; username: string; password?: string | null }
       ) => Promise<unknown>;
+      deleteSellerUser: (id: number) => Promise<unknown>;
 
       listServices: (activeOnly?: boolean) => Promise<Service[]>;
       createService: (input: ServiceInput) => Promise<Service>;

@@ -10,6 +10,7 @@ export const ClientsPage = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [createFormKey, setCreateFormKey] = useState(0);
+  const [deleteInfo, setDeleteInfo] = useState<string | null>(null);
   const editModal = useModal<Client>();
   const { data = [] } = useQuery({ queryKey: ['clients'], queryFn: api.listClients });
 
@@ -73,8 +74,16 @@ export const ClientsPage = () => {
                     <Button variant="secondary" onClick={() => editModal.open(row)}>Editar</Button>
                     <Button
                       variant="danger"
-                      disabled={Number(row.ordersCount ?? 0) > 0}
-                      onClick={() => deleteMutation.mutate(row.id)}
+                      onClick={() => {
+                        if (Number(row.ordersCount ?? 0) > 0) {
+                          setDeleteInfo(
+                            `No se puede eliminar este cliente porque tiene ${row.ordersCount} orden(es) creada(s).`
+                          );
+                          return;
+                        }
+                        setDeleteInfo(null);
+                        deleteMutation.mutate(row.id);
+                      }}
                       title={
                         Number(row.ordersCount ?? 0) > 0
                           ? `No se puede eliminar: tiene ${row.ordersCount} orden(es).`
@@ -88,6 +97,7 @@ export const ClientsPage = () => {
               }
             ]}
           />
+          {deleteInfo && <p className="error-text" style={{ marginTop: 10 }}>{deleteInfo}</p>}
         </div>
 
         <div className="card-panel">

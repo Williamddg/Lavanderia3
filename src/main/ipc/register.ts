@@ -549,6 +549,20 @@ export const registerIpc = () => {
   );
 
   ipcMain.handle(
+    'users:create-seller',
+    wrap(async (input) =>
+      createUsersService(await databaseManager.getDb()).createSeller(input)
+    )
+  );
+
+  ipcMain.handle(
+    'users:delete-seller',
+    wrap(async (id: number) =>
+      createUsersService(await databaseManager.getDb()).removeSeller(id)
+    )
+  );
+
+  ipcMain.handle(
     'deliveries:list',
     wrap(async () => createDeliveriesService(await databaseManager.getDb()).list())
   );
