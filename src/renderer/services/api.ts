@@ -49,6 +49,15 @@ async function unwrap<T>(promise: Promise<unknown>): Promise<T> {
   return response.data as T;
 }
 
+const callDesktopApi = <T>(fnName: string, ...args: any[]): Promise<T> => {
+  const desktopApi = window.desktopApi as unknown as Record<string, (...inner: any[]) => Promise<unknown>>;
+  const fn = desktopApi[fnName];
+  if (typeof fn !== 'function') {
+    throw new Error(`La función ${fnName} no está disponible. Reinicia la app para cargar la última versión.`);
+  }
+  return fn(...args) as Promise<T>;
+};
+
 export const api = {
   licenseStatus: () => unwrap<any>(window.desktopApi.getLicenseStatus()),
   activateLicense: (licenseKey: string) =>
@@ -72,6 +81,10 @@ export const api = {
 
   getOrderProtectionPassword: () =>
     unwrap<string | null>(window.desktopApi.getOrderProtectionPassword()),
+  getPdfOutputDir: () =>
+    unwrap<string | null>(callDesktopApi('getPdfOutputDir')),
+  updatePdfOutputDir: (value: string | null) =>
+    unwrap<{ success: true; value: string | null }>(callDesktopApi('updatePdfOutputDir', value)),
 
   updateOrderProtectionPassword: (input: {
   currentPassword: string;
@@ -102,6 +115,12 @@ export const api = {
   restartApp: () => unwrap<{ restarted: boolean }>(window.desktopApi.restartApp()),
   quitApp: () => unwrap<{ quit: boolean }>(window.desktopApi.quitApp()),
   openExternal: (url: string) => unwrap(window.desktopApi.openExternal({ url })),
+  printToPdf: (defaultFileName?: string) =>
+    unwrap<{ saved: boolean; path: string | null }>(window.desktopApi.printToPdf({ defaultFileName })),
+  printToPdfAuto: (input: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }) =>
+    unwrap<{ saved: boolean; path: string | null }>(callDesktopApi('printToPdfAuto', input)),
+  selectDirectory: () =>
+    unwrap<{ selected: boolean; path: string | null }>(callDesktopApi('selectDirectory')),
   setupCreateDatabase: (input: SetupRootConnectionInput) =>
     unwrap<SetupCreateDatabaseResult>(window.desktopApi.setupCreateDatabase(input)),
   setupInitializeSchema: (input: SetupRootConnectionInput) =>
@@ -117,6 +136,8 @@ export const api = {
     unwrap<{ valid: boolean }>(window.desktopApi.verifyPassword(password)),
 
   listClients: () => unwrap<Client[]>(window.desktopApi.listClients()),
+  searchClientsByName: (term: string, limit = 40) =>
+    unwrap<Client[]>(window.desktopApi.searchClients(term, limit)),
   createClient: (input: ClientInput) => unwrap<Client>(window.desktopApi.createClient(input)),
   updateClient: (id: number, input: ClientInput) => unwrap<Client>(window.desktopApi.updateClient(id, input)),
   deleteClient: (id: number) => unwrap<{ id: number }>(window.desktopApi.deleteClient(id)),

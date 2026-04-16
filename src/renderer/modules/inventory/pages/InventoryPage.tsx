@@ -23,6 +23,7 @@ export const InventoryPage = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [filter, setFilter] = useState('');
   const [form, setForm] = useState<ServiceInput>(emptyForm);
+  const [priceInput, setPriceInput] = useState('0');
 
   const createMutation = useMutation({
     mutationFn: api.createService,
@@ -47,8 +48,14 @@ export const InventoryPage = () => {
     }
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: api.deleteService,
+  const toggleMutation = useMutation({
+    mutationFn: (row: { id: number; categoryId: number | null; name: string; basePrice: number; isActive: boolean }) =>
+      api.updateService(row.id, {
+        categoryId: row.categoryId,
+        name: row.name,
+        basePrice: row.basePrice,
+        isActive: !row.isActive
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['services'] });
       await queryClient.invalidateQueries({ queryKey: ['order-catalogs'] });
@@ -57,9 +64,8 @@ export const InventoryPage = () => {
 
   const filteredServices = useMemo(() => {
     const search = filter.trim().toLowerCase();
-    if (!search) return services;
-
-    return services.filter((service) => {
+    const rows = services.filter((service) => {
+      if (!search) return true;
       const name = service.name.toLowerCase();
       const price = String(service.basePrice);
       const status = service.isActive ? 'activo' : 'inactivo';
@@ -69,11 +75,16 @@ export const InventoryPage = () => {
         status.includes(search)
       );
     });
+    return rows.sort((a, b) => {
+      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+      return a.name.localeCompare(b.name, 'es');
+    });
   }, [services, filter]);
 
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setPriceInput('0');
     setOpen(true);
   };
 
@@ -91,14 +102,16 @@ export const InventoryPage = () => {
       basePrice: service.basePrice,
       isActive: service.isActive
     });
+    setPriceInput(String(Math.max(0, Math.trunc(Number(service.basePrice ?? 0)))));
     setOpen(true);
   };
 
   const handleSubmit = () => {
+    const normalizedPrice = Math.max(0, Math.trunc(Number(priceInput || 0)));
     const payload: ServiceInput = {
       categoryId: form.categoryId ?? null,
       name: form.name.trim(),
-      basePrice: Number(form.basePrice || 0),
+      basePrice: normalizedPrice,
       isActive: Boolean(form.isActive)
     };
 
@@ -165,10 +178,15 @@ export const InventoryPage = () => {
                   </Button>
                   <Button
                     type="button"
-                    variant="danger"
-                    onClick={() => deleteMutation.mutate(row.id)}
+                    variant={row.isActive ? 'danger' : 'secondary'}
+                    style={
+                      row.isActive
+                        ? { background: '#b91c1c', color: '#fff', border: 'none' }
+                        : { background: '#15803d', color: '#fff', border: 'none' }
+                    }
+                    onClick={() => toggleMutation.mutate(row)}
                   >
-                    Desactivar
+                    {row.isActive ? 'Desactivar' : 'Activar'}
                   </Button>
                 </div>
               )
@@ -184,6 +202,7 @@ export const InventoryPage = () => {
           setOpen(false);
           setEditingId(null);
           setForm(emptyForm);
+          setPriceInput('0');
         }}
       >
         <div className="stack-gap">
@@ -200,14 +219,15 @@ export const InventoryPage = () => {
           <label>
             <span>Precio base</span>
             <Input
-              type="number"
-              step="0.01"
-              value={form.basePrice}
+              inputMode="numeric"
+              value={priceInput}
               onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  basePrice: Number(e.target.value)
-                }))
+                setPriceInput((prev) => {
+                  const next = e.target.value;
+                  if (next === '') return '';
+                  if (/^\d+$/.test(next)) return next;
+                  return prev;
+                })
               }
             />
           </label>
@@ -236,6 +256,7 @@ export const InventoryPage = () => {
                 setOpen(false);
                 setEditingId(null);
                 setForm(emptyForm);
+                setPriceInput('0');
               }}
             >
               Cancelar
@@ -259,9 +280,9 @@ export const InventoryPage = () => {
             </p>
           )}
 
-          {deleteMutation.isError && (
+          {toggleMutation.isError && (
             <p className="error-text">
-              {(deleteMutation.error as Error).message}
+              {(toggleMutation.error as Error).message}
             </p>
           )}
         </div>

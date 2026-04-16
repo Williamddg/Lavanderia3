@@ -142,5 +142,44 @@ export const createSettingsService = (db: Kysely<Database>) => ({
       .execute();
 
     return { success: true };
+  },
+
+  async getPdfOutputDir(): Promise<string | null> {
+    const setting = await db
+      .selectFrom('app_settings')
+      .select(['setting_value'])
+      .where('setting_key', '=', 'pdf_output_dir')
+      .orderBy('id desc')
+      .executeTakeFirst();
+
+    return setting ? String(setting.setting_value ?? '').trim() || null : null;
+  },
+
+  async updatePdfOutputDir(value: string | null): Promise<{ success: true; value: string | null }> {
+    const normalized = String(value ?? '').trim() || null;
+    const existing = await db
+      .selectFrom('app_settings')
+      .select(['id'])
+      .where('setting_key', '=', 'pdf_output_dir')
+      .orderBy('id desc')
+      .executeTakeFirst();
+
+    if (existing) {
+      await db
+        .updateTable('app_settings')
+        .set({ setting_value: normalized ?? '' })
+        .where('id', '=', existing.id)
+        .execute();
+    } else {
+      await db
+        .insertInto('app_settings')
+        .values({
+          setting_key: 'pdf_output_dir',
+          setting_value: normalized ?? ''
+        })
+        .execute();
+    }
+
+    return { success: true, value: normalized };
   }
 });

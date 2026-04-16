@@ -776,6 +776,7 @@ export const OrderDetailPage = () => {
         <OrderForm
           clients={clients}
           catalogs={catalogs}
+          onSearchClients={api.searchClientsByName}
           initialValue={data}
           initialDraft={restoredEditDraft}
           onDraftRestored={() => {

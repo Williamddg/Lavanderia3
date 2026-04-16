@@ -315,6 +315,17 @@ export type InvoiceDetail = Invoice & {
     subtotal: number;
     total: number;
   }>;
+  activeOrders: Array<{
+    id: number;
+    orderNumber: string;
+    statusName: string;
+    total: number;
+    paidTotal: number;
+    balanceDue: number;
+    dueDate: string | null;
+  }>;
+  generatedBy: string | null;
+  softwareName: string;
   whatsappMessage: string;
 };
 
@@ -515,6 +526,9 @@ export type ReportsSummary = {
   netUtility: number;
   totalPayments: number;
   totalOrders: number;
+  warrantiesCreated: number;
+  warrantiesClosed: number;
+  openWarranties: number;
   paymentMethods: Array<{
     methodName: string;
     amount: number;
@@ -524,5 +538,23 @@ export type ReportsSummary = {
     statusName: string;
     count: number;
     total: number;
+  }>;
+  expensesByCategory: Array<{
+    categoryName: string;
+    amount: number;
+    count: number;
+  }>;
+  dailySeries: Array<{
+    date: string;
+    sales: number;
+    payments: number;
+    expenses: number;
+    orders: number;
+  }>;
+  biggestExpenses: Array<{
+    date: string;
+    description: string;
+    categoryName: string;
+    amount: number;
   }>;
 };

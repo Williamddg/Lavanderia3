@@ -22,6 +22,8 @@ declare global {
       getPlatform: () => NodeJS.Platform;
       verifyPassword: (password: string) => Promise<ApiResponse<{ valid: boolean }>>;
       getOrderProtectionPassword: () => Promise<unknown>;
+      getPdfOutputDir: () => Promise<unknown>;
+      updatePdfOutputDir: (value: string | null) => Promise<unknown>;
       updateOrderProtectionPassword: (input: {
   currentPassword: string;
   newPassword: string;
@@ -71,6 +73,9 @@ declare global {
       restartApp: () => Promise<unknown>;
       quitApp: () => Promise<unknown>;
       openExternal: (payload: ExternalLinkPayload) => Promise<unknown>;
+      printToPdf: (input?: { defaultFileName?: string }) => Promise<unknown>;
+      printToPdfAuto: (input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }) => Promise<unknown>;
+      selectDirectory: () => Promise<unknown>;
       setupCreateDatabase: (input: SetupRootConnectionInput) => Promise<unknown>;
       setupInitializeSchema: (input: SetupRootConnectionInput) => Promise<unknown>;
       onSetupInitializeProgress: (
@@ -81,6 +86,7 @@ declare global {
       getCompanySettings: () => Promise<unknown>;
 
       listClients: () => Promise<unknown>;
+      searchClients: (term: string, limit?: number) => Promise<unknown>;
       createClient: (input: ClientInput) => Promise<unknown>;
       updateClient: (id: number, input: ClientInput) => Promise<unknown>;
       deleteClient: (id: number) => Promise<unknown>;

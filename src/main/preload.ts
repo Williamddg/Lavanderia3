@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('desktopApi', {
 
   getOrderProtectionPassword: () =>
     ipcRenderer.invoke('settings:get-order-protection-password'),
+  getPdfOutputDir: () =>
+    ipcRenderer.invoke('settings:get-pdf-output-dir'),
+  updatePdfOutputDir: (value: string | null) =>
+    ipcRenderer.invoke('settings:update-pdf-output-dir', value),
 
   updateOrderProtectionPassword: (input: {
   currentPassword: string;
@@ -54,6 +58,10 @@ contextBridge.exposeInMainWorld('desktopApi', {
   restartApp: () => ipcRenderer.invoke('app:restart'),
   quitApp: () => ipcRenderer.invoke('app:quit'),
   openExternal: (payload: ExternalLinkPayload) => ipcRenderer.invoke('app:open-external', payload),
+  printToPdf: (input?: { defaultFileName?: string }) => ipcRenderer.invoke('app:print-to-pdf', input),
+  printToPdfAuto: (input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }) =>
+    ipcRenderer.invoke('app:print-to-pdf-auto', input),
+  selectDirectory: () => ipcRenderer.invoke('app:select-directory'),
   setupCreateDatabase: (input: SetupRootConnectionInput) =>
     ipcRenderer.invoke('setup:create-database', input),
   setupInitializeSchema: (input: SetupRootConnectionInput) =>
@@ -69,6 +77,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
   getCompanySettings: () => ipcRenderer.invoke('settings:company'),
 
   listClients: () => ipcRenderer.invoke('clients:list'),
+  searchClients: (term: string, limit?: number) => ipcRenderer.invoke('clients:search', term, limit),
   createClient: (input: ClientInput) => ipcRenderer.invoke('clients:create', input),
   updateClient: (id: number, input: ClientInput) => ipcRenderer.invoke('clients:update', id, input),
   deleteClient: (id: number) => ipcRenderer.invoke('clients:delete', id),

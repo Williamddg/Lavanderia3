@@ -14,6 +14,8 @@ export const SettingsPage = ({ user }: { user: SessionUser }) => {
   const [currentAdminPassword, setCurrentAdminPassword] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+  const [pdfDirInput, setPdfDirInput] = useState('');
+  const [pdfDirError, setPdfDirError] = useState('');
 
   const { data, refetch } = useQuery({
     queryKey: ['company-settings'],
@@ -27,9 +29,26 @@ export const SettingsPage = ({ user }: { user: SessionUser }) => {
     enabled: unlocked
   });
 
+  const { data: pdfOutputDir } = useQuery({
+    queryKey: ['pdf-output-dir'],
+    queryFn: async () => {
+      try {
+        return await api.getPdfOutputDir();
+      } catch {
+        return null;
+      }
+    },
+    enabled: unlocked
+  });
+
   useEffect(() => {
     if (unlocked && data) setForm(data);
   }, [unlocked, data]);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    setPdfDirInput(pdfOutputDir ?? '');
+  }, [unlocked, pdfOutputDir]);
 
   const connectDriveMutation = useMutation({
     mutationFn: api.connectDriveBackup
@@ -50,6 +69,13 @@ export const SettingsPage = ({ user }: { user: SessionUser }) => {
       setCurrentAdminPassword('');
       setNewAdminPassword('');
       setConfirmAdminPassword('');
+    }
+  });
+
+  const updatePdfDirMutation = useMutation({
+    mutationFn: api.updatePdfOutputDir,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['pdf-output-dir'] });
     }
   });
 
@@ -282,6 +308,57 @@ export const SettingsPage = ({ user }: { user: SessionUser }) => {
     </p>
   )}
 </div>
+
+      <div className="card-panel stack-gap">
+        <h3>PDF y Facturas</h3>
+        <label>
+          <span>Carpeta de guardado PDF (facturas/reportes)</span>
+          <Input
+            value={pdfDirInput}
+            onChange={(e) => setPdfDirInput(e.target.value)}
+            placeholder="Ej: /Users/tuusuario/Documents/LavaSuite/Facturas"
+          />
+        </label>
+        <div className="form-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={async () => {
+              setPdfDirError('');
+              try {
+                const result = await api.selectDirectory();
+                if (result.selected && result.path) {
+                  setPdfDirInput(result.path);
+                }
+              } catch (error) {
+                setPdfDirError((error as Error).message);
+              }
+            }}
+          >
+            Seleccionar carpeta
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setPdfDirError('');
+              updatePdfDirMutation.mutate(pdfDirInput || null);
+            }}
+            disabled={updatePdfDirMutation.isPending}
+          >
+            {updatePdfDirMutation.isPending ? 'Guardando...' : 'Guardar carpeta PDF'}
+          </Button>
+        </div>
+        <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>
+          Aquí se guarda automáticamente la exportación de facturas y reportes.
+        </p>
+        {updatePdfDirMutation.isError && (
+          <p className="error-text">{(updatePdfDirMutation.error as Error).message}</p>
+        )}
+        {pdfDirError && <p className="error-text">{pdfDirError}</p>}
+        {updatePdfDirMutation.isSuccess && (
+          <p style={{ margin: 0, color: 'green' }}>Carpeta PDF actualizada.</p>
+        )}
+      </div>
 
       <div className="card-panel stack-gap">
         <h3>Backups en Google Drive</h3>

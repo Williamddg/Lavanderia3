@@ -62,6 +62,7 @@ const computeItemTotals = (item: OrderInput['items'][number]) => {
 export const OrderForm = ({
   clients,
   catalogs,
+  onSearchClients,
   onSubmit,
   initialValue,
   initialDraft,
@@ -72,6 +73,7 @@ export const OrderForm = ({
 }: {
   clients: Client[];
   catalogs: CatalogsPayload | undefined;
+  onSearchClients?: (term: string, limit?: number) => Promise<Client[]>;
   onSubmit: (value: OrderInput) => void;
   initialValue?: OrderDetail | null;
   initialDraft?: OrderInput | null;
@@ -105,6 +107,9 @@ export const OrderForm = ({
   } = useFieldArray({ control, name: 'initialPaymentLines' });
 
   const [serviceSearch, setServiceSearch] = useState<Record<number, string>>({});
+  const [clientSearch, setClientSearch] = useState('');
+  const [searchedClients, setSearchedClients] = useState<Client[]>([]);
+  const [searchingClients, setSearchingClients] = useState(false);
   const skipNextDraftSyncRef = useRef(Boolean(initialDraft && !initialValue));
 
   const buildServiceSearchState = (items: OrderInput['items']) =>
@@ -237,6 +242,38 @@ export const OrderForm = ({
     };
   }, [getValues, initialValue, onDraftChange, watch]);
 
+  useEffect(() => {
+    if (!onSearchClients) {
+      setSearchedClients([]);
+      return;
+    }
+
+    const term = clientSearch.trim();
+    if (term.length < 2) {
+      setSearchedClients([]);
+      setSearchingClients(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setSearchingClients(true);
+        const rows = await onSearchClients(term, 40);
+        if (!cancelled) setSearchedClients(rows);
+      } catch {
+        if (!cancelled) setSearchedClients([]);
+      } finally {
+        if (!cancelled) setSearchingClients(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [clientSearch, onSearchClients]);
+
   const watchedItems = useWatch({ control, name: 'items' }) ?? [];
   const watchedDiscountTotal = useWatch({ control, name: 'discountTotal' });
   const watchedInitialPaymentLines = useWatch({ control, name: 'initialPaymentLines' }) ?? [];
@@ -273,6 +310,15 @@ export const OrderForm = ({
       String(service.name ?? '').toLowerCase().includes(term)
     );
   };
+
+  const clientOptions = useMemo(() => {
+    const term = clientSearch.trim().toLowerCase();
+    if (!term) return clients;
+    if (searchedClients.length > 0) return searchedClients;
+    return clients.filter((client) =>
+      `${client.firstName} ${client.lastName}`.toLowerCase().includes(term)
+    );
+  }, [clientSearch, searchedClients, clients]);
 
   return (
     <form
@@ -324,6 +370,18 @@ export const OrderForm = ({
       <FormSection title="Encabezado de la orden">
         <div className="form-grid">
           <label>
+            <span>Buscar cliente</span>
+            <Input
+              placeholder="Escribe nombre o apellido"
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+            />
+            {searchingClients ? (
+              <small style={{ color: '#6b7280' }}>Buscando clientes...</small>
+            ) : null}
+          </label>
+
+          <label>
             <span>Cliente</span>
             <Select
               {...register('clientId', {
@@ -332,7 +390,7 @@ export const OrderForm = ({
               })}
             >
               <option value={0}>Selecciona un cliente</option>
-              {clients.map((client) => (
+              {clientOptions.map((client) => (
                 <option key={client.id} value={client.id}>
                   {client.firstName} {client.lastName}
                 </option>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { api } from '@renderer/services/api';
 import { DataTable, PageHeader, Button, Input } from '@renderer/ui/components';
 import { currency, dateTime } from '@renderer/utils/format';
@@ -23,7 +24,8 @@ export const InvoicesPage = () => {
       }
 
       const cleanPhone = detail.clientPhone.replace(/\D/g, '');
-      const url = `https://wa.me/57${cleanPhone}?text=${encodeURIComponent(detail.whatsappMessage)}`;
+      const phone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(detail.whatsappMessage)}`;
 
       await api.openExternal(url);
       return detail;
@@ -88,13 +90,18 @@ export const InvoicesPage = () => {
               key: 'actions',
               header: 'Acciones',
               render: (row) => (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => whatsappMutation.mutate(row.id)}
-                >
-                  WhatsApp
-                </Button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Link className="button button-secondary" to={`/facturas/${row.orderId}`}>
+                    Ver
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => whatsappMutation.mutate(row.id)}
+                  >
+                    WhatsApp
+                  </Button>
+                </div>
               )
             }
           ]}

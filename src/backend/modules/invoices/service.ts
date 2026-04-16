@@ -17,6 +17,11 @@ const buildWhatsappMessage = (invoice: {
   ticketCode: string;
   companyName: string | null;
   items: Array<any>;
+  activeOrders?: Array<{
+    orderNumber: string;
+    statusName: string;
+    balanceDue: number;
+  }>;
 }) => {
   const formatMoney = (value: number) =>
     `$${Number(value ?? 0).toLocaleString('es-CO')}`;
@@ -55,6 +60,16 @@ const buildWhatsappMessage = (invoice: {
     `Saldo: ${formatMoney(invoice.balanceDue)}`,
     `Ticket: ${invoice.ticketCode}`,
     invoice.notes ? `Notas: ${invoice.notes}` : null,
+    invoice.activeOrders && invoice.activeOrders.length > 0
+      ? [
+          '',
+          '*ÓRDENES ACTIVAS DEL CLIENTE*',
+          ...invoice.activeOrders.map(
+            (order, index) =>
+              `${index + 1}. ${order.orderNumber} | ${order.statusName} | Saldo: ${formatMoney(order.balanceDue)}`
+          )
+        ].join('\n')
+      : null,
     invoice.companyPolicies ? `Políticas: ${invoice.companyPolicies}` : null
   ].filter(Boolean);
 
@@ -87,6 +102,37 @@ const mapInvoice = (row: any): Invoice => ({
 });
 
 export const createInvoicesService = (db: Kysely<Database>) => {
+  const getClientActiveOrders = async (clientId: number, excludeOrderId: number) => {
+    const rows = await db
+      .selectFrom('orders as o')
+      .innerJoin('order_statuses as os', 'os.id', 'o.status_id')
+      .select([
+        'o.id',
+        'o.order_number',
+        'o.total',
+        'o.paid_total',
+        'o.balance_due',
+        'o.due_date',
+        sql<string>`os.code`.as('status_code'),
+        sql<string>`os.name`.as('status_name')
+      ])
+      .where('o.client_id', '=', clientId)
+      .where('o.id', '!=', excludeOrderId)
+      .where('os.code', 'not in', ['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'])
+      .orderBy('o.id desc')
+      .execute();
+
+    return rows.map((row) => ({
+      id: row.id,
+      orderNumber: row.order_number,
+      statusName: row.status_name,
+      total: Number(row.total ?? 0),
+      paidTotal: Number(row.paid_total ?? 0),
+      balanceDue: Number(row.balance_due ?? 0),
+      dueDate: row.due_date ? new Date(row.due_date).toISOString() : null
+    }));
+  };
+
   const list = async (): Promise<Invoice[]> => {
     const company = await db
       .selectFrom('company_settings')
@@ -148,6 +194,7 @@ export const createInvoicesService = (db: Kysely<Database>) => {
       .selectFrom('invoices as i')
       .innerJoin('clients as c', 'c.id', 'i.client_id')
       .innerJoin('orders as o', 'o.id', 'i.order_id')
+      .leftJoin('users as u', 'u.id', 'o.created_by')
       .select([
         'i.id',
         'i.invoice_number',
@@ -163,12 +210,15 @@ export const createInvoicesService = (db: Kysely<Database>) => {
         'o.notes as order_notes',
         'o.paid_total',
         'o.balance_due',
+        sql<string | null>`u.full_name`.as('generated_by'),
         sql<string>`c.first_name`.as('first_name'),
         sql<string>`c.last_name`.as('last_name'),
         sql<string | null>`c.phone`.as('client_phone')
       ])
       .where('i.id', '=', id)
       .executeTakeFirstOrThrow();
+
+    const activeOrders = await getClientActiveOrders(invoice.client_id, invoice.order_id);
 
     const items = await db
       .selectFrom('invoice_items_snapshot')
@@ -214,6 +264,9 @@ export const createInvoicesService = (db: Kysely<Database>) => {
         subtotal: Number(item.subtotal),
         total: Number(item.total ?? item.subtotal)
       })),
+      activeOrders,
+      generatedBy: invoice.generated_by ?? null,
+      softwareName: 'LavaSuite Desktop',
       whatsappMessage: buildWhatsappMessage({
         invoiceNumber: mapped.invoiceNumber,
         clientName: mapped.clientName,
@@ -226,6 +279,11 @@ export const createInvoicesService = (db: Kysely<Database>) => {
         balanceDue: mapped.balanceDue,
         ticketCode: mapped.ticketCode,
         companyName: mapped.companyName,
+        activeOrders: activeOrders.map((order) => ({
+          orderNumber: order.orderNumber,
+          statusName: order.statusName,
+          balanceDue: order.balanceDue
+        })),
         items: items.map((item) => ({
           description: item.description,
           quantity: Number(item.quantity),

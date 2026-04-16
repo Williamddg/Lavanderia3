@@ -172,6 +172,7 @@ export const NewOrderPage = () => {
         <OrderForm
           clients={clients}
           catalogs={catalogs}
+          onSearchClients={api.searchClientsByName}
           initialDraft={restoredDraft}
           onDraftRestored={() => {
             window.localStorage.removeItem(ORDER_DRAFT_STORAGE_KEY);

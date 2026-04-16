@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@renderer/services/api';
@@ -14,17 +15,42 @@ export const InvoiceDetailPage = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['invoice-from-order', orderId],
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const autoSavedRef = useRef(false);
+  const { data: pdfOutputDir } = useQuery({
+    queryKey: ['pdf-output-dir'],
     queryFn: async () => {
-      const invoice = await api.createInvoiceFromOrder(Number(orderId));
-      return invoice;
-    },
-    enabled: Boolean(orderId)
+      try {
+        return await api.getPdfOutputDir();
+      } catch {
+        return null;
+      }
+    }
   });
 
-  if (isLoading || !data) {
+  const numericOrderId = Number(orderId);
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['invoice-from-order', orderId],
+    queryFn: async () => {
+      const invoice = await api.createInvoiceFromOrder(numericOrderId);
+      return invoice;
+    },
+    enabled: Number.isFinite(numericOrderId) && numericOrderId > 0,
+    retry: 0
+  });
+
+  if (isLoading) {
     return <div className="card-panel">Cargando factura...</div>;
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="card-panel">
+        <p className="error-text">
+          {(error as Error)?.message || 'No fue posible generar la factura.'}
+        </p>
+      </div>
+    );
   }
 
   const barcodeValue = String(data.ticketCode ?? '')
@@ -33,6 +59,49 @@ export const InvoiceDetailPage = () => {
     .replace(/'/g, '-')
     .trim()
     .toUpperCase();
+
+  const normalizedPhone = String(data.clientPhone ?? '').replace(/\D/g, '');
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const dayFolder = new Date().toISOString().slice(0, 10);
+      const result = await api.printToPdfAuto({
+        defaultFileName: `Factura-${data.invoiceNumber}.pdf`,
+        targetDir: pdfOutputDir ?? null,
+        subfolder: `Facturas/${dayFolder}`
+      });
+      if (result.saved) {
+        alert(`PDF guardado correctamente${result.path ? ` en:\n${result.path}` : ''}`);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'No fue posible generar el PDF.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleWhatsapp = async () => {
+    if (!normalizedPhone) {
+      alert('El cliente no tiene teléfono válido para WhatsApp.');
+      return;
+    }
+
+    const withCountryCode = normalizedPhone.startsWith('57') ? normalizedPhone : `57${normalizedPhone}`;
+    const url = `https://wa.me/${withCountryCode}?text=${encodeURIComponent(data.whatsappMessage)}`;
+    await api.openExternal(url);
+  };
+
+  useEffect(() => {
+    if (!data || autoSavedRef.current) return;
+    autoSavedRef.current = true;
+    const dayFolder = new Date().toISOString().slice(0, 10);
+    void api.printToPdfAuto({
+      defaultFileName: `Factura-${data.invoiceNumber}.pdf`,
+      targetDir: pdfOutputDir ?? null,
+      subfolder: `Facturas/${dayFolder}`
+    });
+  }, [data, pdfOutputDir]);
 
   return (
     <section className="stack-gap invoice-page">
@@ -46,6 +115,18 @@ export const InvoiceDetailPage = () => {
               onClick={() => navigate(`/ordenes/${orderId}`)}
             >
               Volver
+            </Button>
+
+            <Button variant="secondary" onClick={handleWhatsapp}>
+              Enviar por WhatsApp
+            </Button>
+
+            <Button
+              variant="secondary"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+            >
+              {downloadingPdf ? 'Generando PDF...' : 'Descargar PDF'}
             </Button>
 
             <Button onClick={() => window.print()}>
@@ -92,12 +173,33 @@ export const InvoiceDetailPage = () => {
           <p style={{ margin: '4px 0 0' }}>
             <strong>{data.invoiceNumber}</strong>
           </p>
+          <p style={{ margin: 0 }}>Software: {data.softwareName}</p>
+          <p style={{ margin: 0 }}>
+            Generado por: {data.generatedBy || 'Usuario del sistema'}
+          </p>
         </div>
 
         <div className="thermal-divider" />
 
+        {data.activeOrders.length > 0 ? (
+          <>
+            <div className="thermal-meta">
+              <p style={{ marginBottom: 6 }}>
+                <strong>Órdenes activas del cliente</strong>
+              </p>
+              {data.activeOrders.map((order) => (
+                <p key={order.id}>
+                  {order.orderNumber} · {order.statusName} · Total {currency(order.total)} · Saldo {currency(order.balanceDue)}
+                </p>
+              ))}
+            </div>
+            <div className="thermal-divider" />
+          </>
+        ) : null}
+
         <div className="thermal-meta">
           <p><strong>Cliente:</strong> {data.clientName}</p>
+          <p><strong>Teléfono:</strong> {renderValue(data.clientPhone)}</p>
           <p><strong>Fecha:</strong> {dateTime(data.createdAt)}</p>
           <p>
             <strong>Fecha promesa:</strong>{' '}
@@ -221,23 +323,6 @@ export const InvoiceDetailPage = () => {
           <p>Gracias por su compra</p>
         </div>
 
-        <div className="no-print thermal-actions">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={async () => {
-              if (!data.clientPhone) return;
-
-              const phone = data.clientPhone.replace(/\D/g, '');
-              const url = `https://wa.me/57${phone}?text=${encodeURIComponent(
-                data.whatsappMessage
-              )}`;
-              await api.openExternal(url);
-            }}
-          >
-            Enviar por WhatsApp
-          </Button>
-        </div>
       </div>
 
       <style>

@@ -1,4 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { databaseManager } from '../services/database-manager.js';
 import { createClientsService } from '../../backend/modules/clients/service.js';
 import { createOrdersService } from '../../backend/modules/orders/service.js';
@@ -86,6 +88,20 @@ export const registerIpc = () => {
     'settings:get-order-protection-password',
     wrap(async () =>
       createSettingsService(await databaseManager.getDb()).getOrderProtectionPassword()
+    )
+  );
+
+  ipcMain.handle(
+    'settings:get-pdf-output-dir',
+    wrap(async () =>
+      createSettingsService(await databaseManager.getDb()).getPdfOutputDir()
+    )
+  );
+
+  ipcMain.handle(
+    'settings:update-pdf-output-dir',
+    wrap(async (value: string | null) =>
+      createSettingsService(await databaseManager.getDb()).updatePdfOutputDir(value)
     )
   );
 
@@ -186,6 +202,87 @@ export const registerIpc = () => {
     })
   );
 
+  ipcMain.handle('app:print-to-pdf', async (event, input?: { defaultFileName?: string }) => {
+    try {
+      const webContents = event.sender;
+      const defaultFileName = String(input?.defaultFileName ?? 'documento.pdf').trim() || 'documento.pdf';
+
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: 'Guardar PDF',
+        defaultPath: defaultFileName.endsWith('.pdf') ? defaultFileName : `${defaultFileName}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      });
+
+      if (canceled || !filePath) {
+        return { success: true, data: { saved: false, path: null } };
+      }
+
+      const pdf = await webContents.printToPDF({
+        printBackground: true,
+        preferCSSPageSize: true
+      });
+
+      await writeFile(filePath, pdf);
+
+      return { success: true, data: { saved: true, path: filePath } };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'No fue posible generar el PDF.'
+      };
+    }
+  });
+
+  ipcMain.handle(
+    'app:print-to-pdf-auto',
+    async (
+      event,
+      input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }
+    ) => {
+      try {
+        const webContents = event.sender;
+        const defaultFileName = String(input?.defaultFileName ?? 'documento.pdf').trim() || 'documento.pdf';
+        const safeName = defaultFileName.endsWith('.pdf') ? defaultFileName : `${defaultFileName}.pdf`;
+        const resolvedBaseDir = String(input?.targetDir ?? '').trim() || path.join(app.getPath('documents'), 'LavaSuite');
+        const subfolder = String(input?.subfolder ?? '').trim();
+        const outputDir = subfolder ? path.join(resolvedBaseDir, subfolder) : resolvedBaseDir;
+        const outputPath = path.join(outputDir, safeName);
+
+        await mkdir(outputDir, { recursive: true });
+
+        const pdf = await webContents.printToPDF({
+          printBackground: true,
+          preferCSSPageSize: true
+        });
+
+        await writeFile(outputPath, pdf);
+
+        return { success: true, data: { saved: true, path: outputPath } };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'No fue posible generar el PDF.'
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    'app:select-directory',
+    wrap(async () => {
+      const result = await dialog.showOpenDialog({
+        title: 'Seleccionar carpeta',
+        properties: ['openDirectory', 'createDirectory']
+      });
+
+      if (result.canceled || !result.filePaths.length) {
+        return { selected: false, path: null };
+      }
+
+      return { selected: true, path: result.filePaths[0] };
+    })
+  );
+
   ipcMain.handle(
     'setup:create-database',
     wrap(async (input: SetupRootConnectionInput) =>
@@ -242,6 +339,13 @@ export const registerIpc = () => {
   ipcMain.handle(
     'clients:list',
     wrap(async () => createClientsService(await databaseManager.getDb()).list())
+  );
+
+  ipcMain.handle(
+    'clients:search',
+    wrap(async (term: string, limit?: number) =>
+      createClientsService(await databaseManager.getDb()).searchByName(term, limit)
+    )
   );
 
   ipcMain.handle(

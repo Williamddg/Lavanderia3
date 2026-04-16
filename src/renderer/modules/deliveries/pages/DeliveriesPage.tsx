@@ -57,6 +57,15 @@ Tu orden *${orderNumber}* fue entregada correctamente.
 
 Gracias por confiar en nosotros.`;
 
+const normalizeDateKey = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+};
+
+const todayKey = new Date().toISOString().slice(0, 10);
+
 export const DeliveriesPage = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -74,6 +83,16 @@ export const DeliveriesPage = () => {
     queryKey: ['clients'],
     queryFn: api.listClients
   });
+  const { data: pdfOutputDir } = useQuery({
+    queryKey: ['pdf-output-dir'],
+    queryFn: async () => {
+      try {
+        return await api.getPdfOutputDir();
+      } catch {
+        return null;
+      }
+    }
+  });
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<DeliveryInput>(emptyForm);
@@ -81,6 +100,7 @@ export const DeliveriesPage = () => {
 
   const [orderFilter, setOrderFilter] = useState('');
   const [modalOrderFilter, setModalOrderFilter] = useState('');
+  const [exportMode, setExportMode] = useState<'due-today' | 'ready' | 'active-all' | null>(null);
 
   const requestedOrderId = Number(searchParams.get('orderId') || 0);
   const shouldOpenFromOrder = searchParams.get('open') === '1';
@@ -212,6 +232,132 @@ export const DeliveriesPage = () => {
     });
   }, [deliveries, orders, orderFilter]);
 
+  const deliveredTodayRows = useMemo(
+    () =>
+      filteredDeliveries.filter((delivery) => normalizeDateKey(delivery.createdAt) === todayKey),
+    [filteredDeliveries]
+  );
+
+  const shouldDeliverTodayRows = useMemo(() => {
+    return orders.filter((order) => {
+      const statusCode = String(order.statusCode ?? '').toUpperCase();
+      if (['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'].includes(statusCode)) return false;
+      return normalizeDateKey(order.dueDate) === todayKey;
+    });
+  }, [orders]);
+
+  const readyForDeliveryRows = useMemo(() => {
+    return orders.filter((order) => {
+      const statusCode = String(order.statusCode ?? '').toUpperCase();
+      if (['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'].includes(statusCode)) return false;
+      return ['READY', 'READY_FOR_DELIVERY'].includes(statusCode) || String(order.statusName).toUpperCase().includes('LISTO');
+    });
+  }, [orders]);
+
+  const activeOrdersRows = useMemo(() => {
+    return orders.filter((order) => {
+      const statusCode = String(order.statusCode ?? '').toUpperCase();
+      return !['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'].includes(statusCode);
+    });
+  }, [orders]);
+
+  const exportSectionToPdf = async (
+    mode: 'due-today' | 'ready' | 'active-all',
+    fileName: string
+  ) => {
+    setExportMode(mode);
+    await new Promise((resolve) => window.setTimeout(resolve, 60));
+    try {
+      await api.printToPdfAuto({
+        defaultFileName: fileName,
+        targetDir: pdfOutputDir ?? null,
+        subfolder: `Entregas/${todayKey}`
+      });
+    } finally {
+      setExportMode(null);
+    }
+  };
+
+  const buildThermalListHtml = (
+    title: string,
+    rows: Array<{
+      orderNumber: string;
+      clientName: string;
+      dueDate: string | null;
+      total: number;
+      paidTotal: number;
+      balanceDue: number;
+      statusName: string;
+    }>
+  ) => {
+    const money = (v: number) =>
+      new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        maximumFractionDigits: 0
+      }).format(Number(v ?? 0));
+
+    const body = rows.length
+      ? rows
+          .map(
+            (row, idx) => `
+              <div class="item">
+                <div><strong>${idx + 1}. ${row.orderNumber}</strong></div>
+                <div>${row.clientName}</div>
+                <div>Estado: ${row.statusName}</div>
+                <div>Fecha promesa: ${row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-CO') : '—'}</div>
+                <div>Total: ${money(row.total)} | Abono: ${money(row.paidTotal)} | Saldo: ${money(row.balanceDue)}</div>
+              </div>
+            `
+          )
+          .join('')
+      : '<div class="item">Sin órdenes.</div>';
+
+    return `<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${title}</title>
+        <style>
+          @page { size: 80mm auto; margin: 2mm; }
+          body { font-family: monospace; color: #000; margin: 0; padding: 0; width: 76mm; font-size: 11px; }
+          .wrap { padding: 2mm; }
+          h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
+          .item { border-top: 1px dashed #000; padding: 6px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="wrap">
+          <h1>${title}</h1>
+          ${body}
+        </div>
+      </body>
+    </html>`;
+  };
+
+  const printThermalList = (
+    title: string,
+    rows: Array<{
+      orderNumber: string;
+      clientName: string;
+      dueDate: string | null;
+      total: number;
+      paidTotal: number;
+      balanceDue: number;
+      statusName: string;
+    }>
+  ) => {
+    const win = window.open('', '_blank', 'width=430,height=900');
+    if (!win) return;
+    win.document.open();
+    win.document.write(buildThermalListHtml(title, rows));
+    win.document.close();
+    win.onload = () => {
+      win.focus();
+      win.print();
+    };
+  };
+
   const handleSubmit = () => {
     if (!form.orderId) {
       setFormError('Debes seleccionar una orden.');
@@ -245,17 +391,31 @@ export const DeliveriesPage = () => {
         title="Entregas"
         subtitle="Listado de entregas y confirmación de órdenes listas."
         actions={
-          <Button
-            onClick={() => {
-              setOpen(true);
-              setModalOrderFilter('');
-              setForm(emptyForm);
-              setFormError(null);
-              setSearchParams({}, { replace: true });
-            }}
-          >
-            Entregar orden
-          </Button>
+          <div className="row-actions">
+            <Button
+              variant="secondary"
+              onClick={() => exportSectionToPdf('active-all', `Ordenes-activas-${todayKey}.pdf`)}
+            >
+              Exportar activas PDF
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => printThermalList('Órdenes activas en lavandería', activeOrdersRows)}
+            >
+              Imprimir activas
+            </Button>
+            <Button
+              onClick={() => {
+                setOpen(true);
+                setModalOrderFilter('');
+                setForm(emptyForm);
+                setFormError(null);
+                setSearchParams({}, { replace: true });
+              }}
+            >
+              Entregar orden
+            </Button>
+          </div>
         }
       />
 
@@ -292,6 +452,148 @@ export const DeliveriesPage = () => {
             {
               key: 'date',
               header: 'Fecha',
+              render: (row) => dateTime(row.createdAt)
+            }
+          ]}
+        />
+      </div>
+
+      <div
+        className="card-panel stack-gap"
+        style={{ display: exportMode && exportMode !== 'due-today' ? 'none' : 'block' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0 }}>Órdenes que se deben entregar hoy</h3>
+          <div className="row-actions no-print">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => exportSectionToPdf('due-today', `Entregas-hoy-pendientes-${todayKey}.pdf`)}
+            >
+              Exportar PDF
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => printThermalList('Órdenes pendientes para hoy', shouldDeliverTodayRows)}
+            >
+              Imprimir
+            </Button>
+          </div>
+        </div>
+
+        <DataTable
+          rows={shouldDeliverTodayRows}
+          columns={[
+            { key: 'order', header: 'Orden', render: (row) => row.orderNumber },
+            { key: 'client', header: 'Cliente', render: (row) => row.clientName },
+            { key: 'status', header: 'Estado', render: (row) => row.statusName },
+            { key: 'total', header: 'Total', render: (row) => currency(row.total) },
+            { key: 'paid', header: 'Abono', render: (row) => currency(row.paidTotal) },
+            { key: 'balance', header: 'Saldo', render: (row) => currency(row.balanceDue) }
+          ]}
+        />
+      </div>
+
+      <div
+        className="card-panel stack-gap"
+        style={{ display: exportMode && exportMode !== 'ready' ? 'none' : 'block' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0 }}>Órdenes listas para entregar</h3>
+          <div className="row-actions no-print">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => exportSectionToPdf('ready', `Ordenes-listas-para-entregar-${todayKey}.pdf`)}
+            >
+              Exportar PDF
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => printThermalList('Órdenes listas para entregar', readyForDeliveryRows)}
+            >
+              Imprimir
+            </Button>
+          </div>
+        </div>
+
+        <DataTable
+          rows={readyForDeliveryRows}
+          columns={[
+            { key: 'order', header: 'Orden', render: (row) => row.orderNumber },
+            { key: 'client', header: 'Cliente', render: (row) => row.clientName },
+            {
+              key: 'due',
+              header: 'Fecha promesa',
+              render: (row) => (row.dueDate ? dateTime(row.dueDate) : '—')
+            },
+            { key: 'total', header: 'Total', render: (row) => currency(row.total) },
+            { key: 'balance', header: 'Saldo', render: (row) => currency(row.balanceDue) }
+          ]}
+        />
+      </div>
+
+      <div
+        className="card-panel stack-gap"
+        style={{ display: exportMode && exportMode !== 'active-all' ? 'none' : 'block' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <h3 style={{ margin: 0 }}>Órdenes activas en lavandería</h3>
+          <div className="row-actions no-print">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => exportSectionToPdf('active-all', `Ordenes-activas-${todayKey}.pdf`)}
+            >
+              Exportar PDF
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => printThermalList('Órdenes activas en lavandería', activeOrdersRows)}
+            >
+              Imprimir
+            </Button>
+          </div>
+        </div>
+
+        <DataTable
+          rows={activeOrdersRows}
+          columns={[
+            { key: 'order', header: 'Orden', render: (row) => row.orderNumber },
+            { key: 'client', header: 'Cliente', render: (row) => row.clientName },
+            { key: 'status', header: 'Estado', render: (row) => row.statusName },
+            {
+              key: 'due',
+              header: 'Fecha promesa',
+              render: (row) => (row.dueDate ? dateTime(row.dueDate) : '—')
+            },
+            { key: 'total', header: 'Total', render: (row) => currency(row.total) },
+            { key: 'balance', header: 'Saldo', render: (row) => currency(row.balanceDue) }
+          ]}
+        />
+      </div>
+
+      <div className="card-panel stack-gap">
+        <h3 style={{ margin: 0 }}>Órdenes entregadas hoy</h3>
+        <DataTable
+          rows={deliveredTodayRows}
+          columns={[
+            {
+              key: 'order',
+              header: 'Orden',
+              render: (row) => getOrderDisplay(row.orderId)
+            },
+            {
+              key: 'who',
+              header: 'Recibe',
+              render: (row) => row.deliveredTo
+            },
+            {
+              key: 'date',
+              header: 'Hora',
               render: (row) => dateTime(row.createdAt)
             }
           ]}

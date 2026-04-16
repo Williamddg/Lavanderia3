@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import type { Client, ClientInput } from '../../../shared/types.js';
 import { createClientRepository } from './repositories/client-repository.js';
@@ -31,6 +31,29 @@ export const createClientsService = (db: Kysely<Database>) => {
   return {
     async list(): Promise<Client[]> {
       return (await repository.list()).map(mapClient);
+    },
+
+    async searchByName(term: string, limit = 40): Promise<Client[]> {
+      const normalized = String(term ?? '').trim();
+      if (!normalized) return [];
+
+      const likeTerm = `%${normalized}%`;
+      const rows = await db
+        .selectFrom('clients')
+        .selectAll()
+        .where((eb) =>
+          eb.or([
+            eb('first_name', 'like', likeTerm),
+            eb('last_name', 'like', likeTerm),
+            sql<boolean>`CONCAT(first_name, ' ', last_name) LIKE ${likeTerm}`
+          ])
+        )
+        .orderBy('first_name')
+        .orderBy('last_name')
+        .limit(Math.max(1, Math.min(100, Number(limit) || 40)))
+        .execute();
+
+      return rows.map(mapClient);
     },
 
     async create(input: ClientInput): Promise<Client> {
