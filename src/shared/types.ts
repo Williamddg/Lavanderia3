@@ -171,6 +171,7 @@ export type Order = {
   statusName: string;
   statusColor: string;
   notes: string | null;
+  discountReason: string | null;
   subtotal: number;
   discountTotal: number;
   total: number;
@@ -185,9 +186,11 @@ export type OrderInput = {
   notes: string | null;
   dueDate: string | null;
   discountTotal: number;
+  discountReason: string | null;
   paidAmount: number;
   initialPaymentMethodId?: number | null;
   initialPaymentReference?: string | null;
+  initialPaymentReason?: string | null;
   items: OrderItemInput[];
 };
 
@@ -206,6 +209,7 @@ export type Payment = {
   paymentMethodName: string;
   amount: number;
   reference: string | null;
+  notes: string | null;
   createdAt: string;
 };
 
@@ -214,6 +218,7 @@ export type PaymentInput = {
   paymentMethodId: number;
   amount: number;
   reference: string | null;
+  notes?: string | null;
 };
 
 export type Invoice = {

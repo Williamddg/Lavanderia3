@@ -7,7 +7,8 @@ const schema = z.object({
   orderId: z.number().positive(),
   paymentMethodId: z.number().positive(),
   amount: z.number().positive(),
-  reference: z.string().nullable()
+  reference: z.string().nullable(),
+  notes: z.string().nullable().optional()
 });
 
 const mapPayment = (row: any): Payment => ({
@@ -18,6 +19,7 @@ const mapPayment = (row: any): Payment => ({
   paymentMethodName: row.payment_method_name,
   amount: Number(row.amount),
   reference: row.reference,
+  notes: row.notes ?? null,
   createdAt: new Date(row.created_at).toISOString()
 });
 
@@ -33,6 +35,7 @@ export const createPaymentsService = (db: Kysely<Database>) => {
         'p.payment_method_id',
         'p.amount',
         'p.reference',
+        'p.notes',
         'p.created_at',
         sql<string>`pm.name`.as('payment_method_name')
       ])
@@ -64,7 +67,8 @@ export const createPaymentsService = (db: Kysely<Database>) => {
           order_id: parsed.orderId,
           payment_method_id: parsed.paymentMethodId,
           amount: parsed.amount,
-          reference: parsed.reference
+          reference: parsed.reference,
+          notes: parsed.notes ?? null
         })
         .executeTakeFirstOrThrow();
 

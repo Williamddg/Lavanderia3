@@ -17,7 +17,7 @@ const orderItemSchema = z.object({
   garmentTypeId: z.number().nullable(),
   serviceId: z.number().nullable(),
   description: z.string().trim().min(3),
-  quantity: z.number().positive(),
+  quantity: z.number().int().positive(),
   color: z.string().nullable(),
   brand: z.string().nullable(),
   sizeReference: z.string().nullable(),
@@ -41,9 +41,11 @@ const orderSchema = z.object({
   notes: z.string().nullable(),
   dueDate: z.string().nullable(),
   discountTotal: z.number().nonnegative(),
+  discountReason: z.string().nullable().optional(),
   paidAmount: z.number().nonnegative(),
   initialPaymentMethodId: z.number().nullable().optional(),
   initialPaymentReference: z.string().nullable().optional(),
+  initialPaymentReason: z.string().nullable().optional(),
   items: z.array(orderItemSchema).min(1)
 });
 
@@ -56,6 +58,7 @@ const mapOrder = (row: any): Order => ({
   statusName: row.status_name,
   statusColor: row.status_color,
   notes: row.notes,
+  discountReason: row.discount_reason ?? null,
   subtotal: Number(row.subtotal),
   discountTotal: Number(row.discount_total),
   total: Number(row.total),
@@ -70,6 +73,49 @@ export const createOrdersService = (db: Kysely<Database>) => {
   const paymentsService = createPaymentsService(db);
   const invoicesService = createInvoicesService(db);
   const deliveriesService = createDeliveriesService(db);
+
+  const normalizeItems = async (items: z.infer<typeof orderItemSchema>[]) => {
+    const serviceIds = Array.from(
+      new Set(
+        items
+          .map((item) => item.serviceId)
+          .filter((serviceId): serviceId is number => Number.isFinite(serviceId))
+      )
+    );
+
+    const services = serviceIds.length
+      ? await db
+          .selectFrom('services')
+          .select(['id', 'base_price'])
+          .where('id', 'in', serviceIds)
+          .execute()
+      : [];
+
+    const servicePriceMap = new Map(
+      services.map((service) => [service.id, Number(service.base_price ?? 0)])
+    );
+
+    return items.map((item) => {
+      const quantity = Math.max(1, Math.trunc(Number(item.quantity)));
+      const unitPrice = item.serviceId
+        ? Number(servicePriceMap.get(item.serviceId) ?? item.unitPrice)
+        : Number(item.unitPrice);
+      const discountAmount = Number(item.discountAmount || 0);
+      const surchargeAmount = Number(item.surchargeAmount || 0);
+      const subtotal = quantity * unitPrice;
+      const total = Math.max(0, subtotal - discountAmount + surchargeAmount);
+
+      return {
+        ...item,
+        quantity,
+        unitPrice,
+        discountAmount,
+        surchargeAmount,
+        subtotal,
+        total
+      };
+    });
+  };
 
   const detail = async (id: number): Promise<OrderDetail> => {
     const order = await repository.findById(id);
@@ -115,6 +161,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
 
   const create = async (input: OrderInput): Promise<OrderDetail> => {
     const parsed = orderSchema.parse(input);
+    const normalizedItems = await normalizeItems(parsed.items);
 
     const counter = await db
       .selectFrom('counters')
@@ -125,8 +172,8 @@ export const createOrdersService = (db: Kysely<Database>) => {
     const nextValue = Number(counter.current_value) + 1;
     const orderNumber = `${counter.prefix}-${String(nextValue).padStart(counter.padding, '0')}`;
 
-    const subtotal = parsed.items.reduce((sum, item) => sum + item.subtotal, 0);
-    const itemsTotal = parsed.items.reduce((sum, item) => sum + item.total, 0);
+    const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const itemsTotal = normalizedItems.reduce((sum, item) => sum + item.total, 0);
     const total = Math.max(0, itemsTotal - parsed.discountTotal);
     const paidTotal = Math.min(parsed.paidAmount, total);
 
@@ -157,6 +204,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
           client_id: parsed.clientId,
           status_id: receivedStatus.id,
           notes: parsed.notes,
+          discount_reason: parsed.discountReason ?? null,
           subtotal,
           discount_total: parsed.discountTotal,
           total,
@@ -171,7 +219,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
       await trx
         .insertInto('order_items')
         .values(
-          parsed.items.map((item) => ({
+          normalizedItems.map((item) => ({
             order_id: orderId,
             garment_type_id: item.garmentTypeId,
             service_id: item.serviceId,
@@ -231,7 +279,8 @@ export const createOrdersService = (db: Kysely<Database>) => {
         orderId,
         paymentMethodId: parsed.initialPaymentMethodId as number,
         amount: paidTotal,
-        reference: parsed.initialPaymentReference || 'Abono inicial'
+        reference: parsed.initialPaymentReference || 'Abono inicial',
+        notes: parsed.initialPaymentReason || null
       });
     }
 
@@ -240,6 +289,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
 
   const update = async (orderId: number, input: OrderInput): Promise<OrderDetail> => {
     const parsed = orderSchema.parse(input);
+    const normalizedItems = await normalizeItems(parsed.items);
 
     const existingOrder = await db
       .selectFrom('orders')
@@ -261,8 +311,8 @@ export const createOrdersService = (db: Kysely<Database>) => {
       throw new Error('No puedes editar una orden que ya fue entregada.');
     }
 
-    const subtotal = parsed.items.reduce((sum, item) => sum + item.subtotal, 0);
-    const itemsTotal = parsed.items.reduce((sum, item) => sum + item.total, 0);
+    const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const itemsTotal = normalizedItems.reduce((sum, item) => sum + item.total, 0);
     const total = Math.max(0, itemsTotal - parsed.discountTotal);
     const paidTotal = Number(existingOrder.paid_total ?? 0);
 
@@ -278,6 +328,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
         .set({
           client_id: parsed.clientId,
           notes: parsed.notes,
+          discount_reason: parsed.discountReason ?? null,
           subtotal,
           discount_total: parsed.discountTotal,
           total,
@@ -295,7 +346,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
       await trx
         .insertInto('order_items')
         .values(
-          parsed.items.map((item) => ({
+          normalizedItems.map((item) => ({
             order_id: orderId,
             garment_type_id: item.garmentTypeId,
             service_id: item.serviceId,

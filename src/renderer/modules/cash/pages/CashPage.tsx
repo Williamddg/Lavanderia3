@@ -13,6 +13,14 @@ import {
 import { currency, dateTime } from '@renderer/utils/format';
 
 const ADMIN_WHATSAPP_STORAGE_KEY = 'cash_close_admin_whatsapp';
+const CASH_OPENING_PRESETS_STORAGE_KEY = 'cash_opening_presets_v1';
+const CASH_OPENING_PRESETS_LIMIT = 3;
+
+type CashOpeningPreset = {
+  openedByName: string;
+  openedByPhone: string;
+  adminWhatsapp: string;
+};
 
 const normalizePhone = (raw?: string | null) => {
   const digits = String(raw ?? '').replace(/\D/g, '');
@@ -381,6 +389,16 @@ export const CashPage = () => {
   });
   const [openedByName, setOpenedByName] = useState('');
   const [openedByPhone, setOpenedByPhone] = useState('');
+  const [openingPresets, setOpeningPresets] = useState<CashOpeningPreset[]>(() => {
+    try {
+      const raw = localStorage.getItem(CASH_OPENING_PRESETS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as CashOpeningPreset[];
+      return Array.isArray(parsed) ? parsed.slice(0, CASH_OPENING_PRESETS_LIMIT) : [];
+    } catch {
+      return [];
+    }
+  });
   const [openCashError, setOpenCashError] = useState<string | null>(null);
   const [lastClosedPreview, setLastClosedPreview] = useState<CashCloseResult | null>(null);
 
@@ -395,6 +413,13 @@ export const CashPage = () => {
   }, [adminWhatsapp]);
 
   useEffect(() => {
+    localStorage.setItem(
+      CASH_OPENING_PRESETS_STORAGE_KEY,
+      JSON.stringify(openingPresets.slice(0, CASH_OPENING_PRESETS_LIMIT))
+    );
+  }, [openingPresets]);
+
+  useEffect(() => {
     if (data?.activeSession) {
       setOpenedByName(data.activeSession.openedByName ?? '');
       setOpenedByPhone(data.activeSession.openedByPhone ?? '');
@@ -404,6 +429,25 @@ export const CashPage = () => {
   const openMutation = useMutation({
     mutationFn: api.openCashSession,
     onSuccess: async () => {
+      const nextPreset: CashOpeningPreset = {
+        openedByName: openedByName.trim(),
+        openedByPhone: openedByPhone.trim(),
+        adminWhatsapp: adminWhatsapp.trim()
+      };
+
+      setOpeningPresets((prev) => {
+        const deduped = prev.filter(
+          (item) =>
+            !(
+              item.openedByName === nextPreset.openedByName &&
+              item.openedByPhone === nextPreset.openedByPhone &&
+              item.adminWhatsapp === nextPreset.adminWhatsapp
+            )
+        );
+
+        return [nextPreset, ...deduped].slice(0, CASH_OPENING_PRESETS_LIMIT);
+      });
+
       setOpenCashError(null);
       await queryClient.invalidateQueries({ queryKey: ['cash-summary'] });
     }
@@ -488,6 +532,12 @@ export const CashPage = () => {
     });
   };
 
+  const applyOpeningPreset = (preset: CashOpeningPreset) => {
+    setOpenedByName(preset.openedByName);
+    setOpenedByPhone(preset.openedByPhone);
+    setAdminWhatsapp(preset.adminWhatsapp);
+  };
+
   return (
     <section className="stack-gap">
       <PageHeader
@@ -540,6 +590,32 @@ export const CashPage = () => {
               onChange={(e) => setAdminWhatsapp(e.target.value)}
             />
           </label>
+
+          {openingPresets.length ? (
+            <div className="card-panel stack-gap" style={{ background: '#f8fafc' }}>
+              <strong>Últimos datos usados</strong>
+              {openingPresets.map((preset, index) => (
+                <div
+                  key={`${preset.openedByName}-${preset.openedByPhone}-${preset.adminWhatsapp}-${index}`}
+                  className="recent-preset-row"
+                >
+                  <div>
+                    <strong>{preset.openedByName}</strong>
+                    <p style={{ margin: '4px 0 0' }}>
+                      {preset.openedByPhone || 'Sin celular'} | Admin: {preset.adminWhatsapp || 'Sin WhatsApp'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => applyOpeningPreset(preset)}
+                  >
+                    Seleccionar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <label>
             <span>Monto inicial</span>

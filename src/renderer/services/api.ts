@@ -11,6 +11,7 @@ import type {
   DashboardSummary,
   DeliveryInput,
   DeliveryRecord,
+  HealthStatus,
   Invoice,
   InvoiceDetail,
   LoginInput,

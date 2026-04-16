@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@renderer/services/api';
 import { NavLink, Outlet } from 'react-router-dom';
 import type { SessionUser } from '@shared/types';
 
@@ -26,6 +28,10 @@ type AppShellProps = {
 
 export const AppShell = ({ user, onLogout }: AppShellProps) => {
   const [now, setNow] = useState(() => new Date());
+  const { data: company } = useQuery({
+    queryKey: ['company-settings'],
+    queryFn: api.companySettings
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -39,9 +45,19 @@ export const AppShell = ({ user, onLogout }: AppShellProps) => {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand-panel">
-          <strong>LavaSuite</strong>
-          <span>Lavandería & Sastrería</span>
-          <small>Sucursal principal</small>
+          {company?.logoBase64 ? (
+            <img
+              src={company.logoBase64}
+              alt={company.companyName || 'Logo de la empresa'}
+              className="brand-logo"
+            />
+          ) : (
+            <div className="brand-logo brand-logo-fallback">
+              {(company?.companyName || 'LS').slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <strong>{company?.companyName || 'LavaSuite'}</strong>
+          {company?.legalName ? <span>{company.legalName}</span> : null}
         </div>
 
         <nav className="sidebar-nav">

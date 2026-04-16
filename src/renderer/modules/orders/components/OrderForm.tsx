@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import type { CatalogsPayload, Client, OrderDetail, OrderInput } from '@shared/types';
 import { Button, FormSection, Input, Select, Textarea } from '@renderer/ui/components';
@@ -9,9 +9,11 @@ const defaultValues: OrderInput = {
   notes: null,
   dueDate: null,
   discountTotal: 0,
+  discountReason: null,
   paidAmount: 0,
   initialPaymentMethodId: null,
   initialPaymentReference: null,
+  initialPaymentReason: null,
   items: [
     {
       garmentTypeId: null,
@@ -43,6 +45,9 @@ export const OrderForm = ({
   catalogs,
   onSubmit,
   initialValue,
+  initialDraft,
+  onDraftChange,
+  onDraftRestored,
   hideInitialPaymentFields = false,
   submitLabel = 'Guardar orden'
 }: {
@@ -50,6 +55,9 @@ export const OrderForm = ({
   catalogs: CatalogsPayload | undefined;
   onSubmit: (value: OrderInput) => void;
   initialValue?: OrderDetail | null;
+  initialDraft?: OrderInput | null;
+  onDraftChange?: (value: OrderInput) => void;
+  onDraftRestored?: () => void;
   hideInitialPaymentFields?: boolean;
   submitLabel?: string;
 }) => {
@@ -60,6 +68,7 @@ export const OrderForm = ({
     setValue,
     handleSubmit,
     reset,
+    getValues,
     formState: { errors }
   } = useForm<OrderInput>({ defaultValues });
 
@@ -69,61 +78,160 @@ export const OrderForm = ({
   });
 
   const [serviceSearch, setServiceSearch] = useState<Record<number, string>>({});
+  const skipNextDraftSyncRef = useRef(Boolean(initialDraft && !initialValue));
 
-  useEffect(() => {
-    if (!initialValue) {
-      reset(defaultValues);
-      setServiceSearch({});
-      return;
-    }
-
-    const mapped: OrderInput = {
-      clientId: initialValue.clientId,
-      notes: initialValue.notes || null,
-      dueDate: initialValue.dueDate ? initialValue.dueDate.slice(0, 10) : null,
-      discountTotal: Number(initialValue.discountTotal || 0),
-      paidAmount: 0,
-      initialPaymentMethodId: null,
-      initialPaymentReference: null,
-      items: initialValue.items.map((item) => ({
-        garmentTypeId: item.garmentTypeId,
-        serviceId: item.serviceId,
-        description: item.description,
-        quantity: Number(item.quantity),
-        color: null,
-        brand: null,
-        sizeReference: null,
-        material: null,
-        receivedCondition: null,
-        workDetail: null,
-        stains: null,
-        damages: null,
-        missingAccessories: null,
-        customerObservations: item.customerObservations,
-        internalObservations: null,
-        unitPrice: Number(item.unitPrice),
-        discountAmount: Number(item.discountAmount),
-        surchargeAmount: Number(item.surchargeAmount),
-        subtotal: Number(item.subtotal),
-        total: Number(item.total)
-      }))
-    };
-
-    reset(mapped);
-    replace(mapped.items);
-
-    const initialSearchState = mapped.items.reduce<Record<number, string>>((acc, item, index) => {
+  const buildServiceSearchState = (items: OrderInput['items']) =>
+    items.reduce<Record<number, string>>((acc, item, index) => {
       acc[index] = item.serviceId
         ? catalogs?.services?.find((service) => service.id === item.serviceId)?.name ?? ''
         : '';
       return acc;
     }, {});
-    setServiceSearch(initialSearchState);
-  }, [initialValue, reset, replace, catalogs]);
+
+  useEffect(() => {
+    if (initialValue) {
+      const mapped: OrderInput = {
+        clientId: initialValue.clientId,
+        notes: initialValue.notes || null,
+        dueDate: initialValue.dueDate ? initialValue.dueDate.slice(0, 10) : null,
+        discountTotal: Number(initialValue.discountTotal || 0),
+        discountReason: initialValue.discountReason || null,
+        paidAmount: 0,
+        initialPaymentMethodId: null,
+        initialPaymentReference: null,
+        initialPaymentReason: null,
+        items: initialValue.items.map((item) => ({
+          garmentTypeId: item.garmentTypeId,
+          serviceId: item.serviceId,
+          description: item.description,
+          quantity: Number(item.quantity),
+          color: null,
+          brand: null,
+          sizeReference: null,
+          material: null,
+          receivedCondition: null,
+          workDetail: null,
+          stains: null,
+          damages: null,
+          missingAccessories: null,
+          customerObservations: item.customerObservations,
+          internalObservations: null,
+          unitPrice: Number(item.unitPrice),
+          discountAmount: Number(item.discountAmount),
+          surchargeAmount: Number(item.surchargeAmount),
+          subtotal: Number(item.subtotal),
+          total: Number(item.total)
+        }))
+      };
+
+      reset(mapped);
+      replace(mapped.items);
+      setServiceSearch(buildServiceSearchState(mapped.items));
+      return;
+    }
+
+    if (initialDraft) {
+      const hydratedDraft: OrderInput = {
+        ...defaultValues,
+        ...initialDraft,
+        items: initialDraft.items?.length ? initialDraft.items : defaultValues.items
+      };
+
+      reset(hydratedDraft);
+      replace(hydratedDraft.items);
+      setServiceSearch(buildServiceSearchState(hydratedDraft.items));
+      onDraftRestored?.();
+      return;
+    }
+
+    if (!initialValue) {
+      reset(defaultValues);
+      setServiceSearch({});
+      return;
+    }
+  }, [initialValue, initialDraft, reset, replace, catalogs, onDraftRestored]);
+
+  useEffect(() => {
+    if (!onDraftChange || initialValue) {
+      return;
+    }
+
+    const timeoutRef = { current: 0 as number | undefined };
+    const subscription = watch(() => {
+      if (skipNextDraftSyncRef.current) {
+        skipNextDraftSyncRef.current = false;
+        return;
+      }
+
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = window.setTimeout(() => {
+        const current = getValues();
+        onDraftChange({
+          ...current,
+          notes: current.notes || null,
+          dueDate: current.dueDate || null,
+          discountTotal: Number(current.discountTotal || 0),
+          paidAmount: Number(current.paidAmount || 0),
+          initialPaymentMethodId: current.initialPaymentMethodId
+            ? Number(current.initialPaymentMethodId)
+            : null,
+          initialPaymentReference: current.initialPaymentReference || null,
+          items: (current.items?.length ? current.items : defaultValues.items).map((item) => ({
+            ...item,
+            color: item.color || null,
+            brand: item.brand || null,
+            sizeReference: item.sizeReference || null,
+            material: item.material || null,
+            receivedCondition: item.receivedCondition || null,
+            workDetail: item.workDetail || null,
+            stains: item.stains || null,
+            damages: item.damages || null,
+            missingAccessories: item.missingAccessories || null,
+            customerObservations: item.customerObservations || null,
+            internalObservations: item.internalObservations || null,
+            quantity: Number(item.quantity || 0),
+            unitPrice: Number(item.unitPrice || 0),
+            discountAmount: Number(item.discountAmount || 0),
+            surchargeAmount: Number(item.surchargeAmount || 0),
+            subtotal: Number(item.subtotal || 0),
+            total: Number(item.total || 0)
+          }))
+        });
+      }, 250);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      window.clearTimeout(timeoutRef.current);
+    };
+  }, [getValues, initialValue, onDraftChange, watch]);
 
   const items = watch('items');
   const discountTotal = Number(watch('discountTotal') || 0);
   const paidAmount = Number(watch('paidAmount') || 0);
+
+  useEffect(() => {
+    items.forEach((item, index) => {
+      const normalizedQuantity = Math.max(1, Math.trunc(Number(item.quantity || 1)));
+      const normalizedUnitPrice = Number(item.unitPrice || 0);
+      const normalizedDiscount = Number(item.discountAmount || 0);
+      const normalizedSurcharge = Number(item.surchargeAmount || 0);
+      const nextSubtotal = normalizedQuantity * normalizedUnitPrice;
+      const nextTotal = Math.max(0, nextSubtotal - normalizedDiscount + normalizedSurcharge);
+
+      if (Number(item.quantity) !== normalizedQuantity) {
+        setValue(`items.${index}.quantity`, normalizedQuantity);
+      }
+
+      if (Number(item.subtotal || 0) !== nextSubtotal) {
+        setValue(`items.${index}.subtotal`, nextSubtotal);
+      }
+
+      if (Number(item.total || 0) !== nextTotal) {
+        setValue(`items.${index}.total`, nextTotal);
+      }
+    });
+  }, [items, setValue]);
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
@@ -138,7 +246,7 @@ export const OrderForm = ({
   const balance = Math.max(0, total - paidAmount);
 
   const recalculateItem = (index: number) => {
-    const quantity = Number(watch(`items.${index}.quantity`) || 0);
+    const quantity = Math.max(1, Math.trunc(Number(watch(`items.${index}.quantity`) || 1)));
     const unitPrice = Number(watch(`items.${index}.unitPrice`) || 0);
     const discount = Number(watch(`items.${index}.discountAmount`) || 0);
     const surcharge = Number(watch(`items.${index}.surchargeAmount`) || 0);
@@ -146,6 +254,7 @@ export const OrderForm = ({
     const itemSubtotal = quantity * unitPrice;
     const itemTotal = Math.max(0, itemSubtotal - discount + surcharge);
 
+    setValue(`items.${index}.quantity`, quantity);
     setValue(`items.${index}.subtotal`, itemSubtotal);
     setValue(`items.${index}.total`, itemTotal);
   };
@@ -176,6 +285,7 @@ export const OrderForm = ({
           dueDate: values.dueDate || null,
           notes: values.notes || null,
           discountTotal: Number(values.discountTotal || 0),
+          discountReason: values.discountReason || null,
           paidAmount: Number(values.paidAmount || 0),
           initialPaymentMethodId:
             !hideInitialPaymentFields && values.paidAmount > 0
@@ -184,6 +294,10 @@ export const OrderForm = ({
           initialPaymentReference:
             !hideInitialPaymentFields && values.paidAmount > 0
               ? values.initialPaymentReference || null
+              : null,
+          initialPaymentReason:
+            !hideInitialPaymentFields && values.paidAmount > 0
+              ? values.initialPaymentReason || null
               : null,
           items: values.items.map((item) => ({
             ...item,
@@ -197,7 +311,7 @@ export const OrderForm = ({
             damages: null,
             missingAccessories: null,
             internalObservations: null,
-            quantity: Number(item.quantity),
+            quantity: Math.max(1, Math.trunc(Number(item.quantity))),
             unitPrice: Number(item.unitPrice),
             discountAmount: Number(item.discountAmount),
             surchargeAmount: Number(item.surchargeAmount),
@@ -234,48 +348,6 @@ export const OrderForm = ({
             <span>Fecha promesa</span>
             <Input type="date" {...register('dueDate')} />
           </label>
-
-          <label>
-            <span>Descuento global</span>
-            <Input
-              type="number"
-              step="0.01"
-              {...register('discountTotal', { valueAsNumber: true })}
-            />
-          </label>
-
-          <label>
-            <span>Abono inicial</span>
-            <Input
-              type="number"
-              step="0.01"
-              {...register('paidAmount', { valueAsNumber: true })}
-              disabled={hideInitialPaymentFields}
-            />
-          </label>
-
-          {!hideInitialPaymentFields && paidAmount > 0 && (
-            <>
-              <label>
-                <span>Método de pago</span>
-                <Select
-                  {...register('initialPaymentMethodId', { valueAsNumber: true })}
-                >
-                  <option value="">Seleccionar</option>
-                  {catalogs?.paymentMethods.map((method) => (
-                    <option key={method.id} value={method.id}>
-                      {method.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-
-              <label>
-                <span>Referencia</span>
-                <Input {...register('initialPaymentReference')} />
-              </label>
-            </>
-          )}
 
           <label className="full-span">
             <span>Notas generales</span>
@@ -360,7 +432,8 @@ export const OrderForm = ({
                   <span>Cantidad</span>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="1"
+                    min="1"
                     {...register(`items.${index}.quantity` as const, {
                       valueAsNumber: true,
                       onChange: () => recalculateItem(index)
@@ -373,6 +446,7 @@ export const OrderForm = ({
                   <Input
                     type="number"
                     step="0.01"
+                    disabled={Boolean(watch(`items.${index}.serviceId` as const))}
                     {...register(`items.${index}.unitPrice` as const, {
                       valueAsNumber: true,
                       onChange: () => recalculateItem(index)
@@ -501,23 +575,82 @@ export const OrderForm = ({
       </FormSection>
 
       <div className="totals-panel">
-        <div>
+        <div className="total-box">
           <span>Subtotal</span>
           <strong>{currency(subtotal)}</strong>
         </div>
-        <div>
+        <div className="total-box">
           <span>Descuento</span>
           <strong>{currency(discountTotal)}</strong>
         </div>
-        <div>
+        <div className="total-box">
           <span>Total</span>
           <strong>{currency(total)}</strong>
         </div>
-        <div>
+        <div className="total-box">
           <span>Saldo</span>
           <strong>{currency(balance)}</strong>
         </div>
       </div>
+
+      <FormSection title="Descuentos y abono">
+        <div className="form-grid">
+          <label>
+            <span>Descuento global</span>
+            <Input
+              type="number"
+              step="0.01"
+              {...register('discountTotal', { valueAsNumber: true })}
+            />
+          </label>
+
+          <label>
+            <span>Razón del descuento</span>
+            <Input {...register('discountReason')} placeholder="Ej: cortesía, cliente frecuente..." />
+          </label>
+
+          <label>
+            <span>Abono inicial</span>
+            <Input
+              type="number"
+              step="0.01"
+              {...register('paidAmount', { valueAsNumber: true })}
+              disabled={hideInitialPaymentFields}
+            />
+          </label>
+
+          {!hideInitialPaymentFields && paidAmount > 0 && (
+            <>
+              <label>
+                <span>Método de pago</span>
+                <Select
+                  {...register('initialPaymentMethodId', { valueAsNumber: true })}
+                >
+                  <option value="">Seleccionar</option>
+                  {catalogs?.paymentMethods.map((method) => (
+                    <option key={method.id} value={method.id}>
+                      {method.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+
+              <label>
+                <span>Referencia</span>
+                <Input {...register('initialPaymentReference')} />
+              </label>
+
+              <label className="full-span">
+                <span>Razón del abono</span>
+                <Input
+                  {...register('initialPaymentReason')}
+                  placeholder="Ej: separa trabajo, abono parcial acordado..."
+                />
+              </label>
+            </>
+          )}
+        </div>
+      </FormSection>
 
       <div className="form-actions">
         <Button type="submit">{submitLabel}</Button>

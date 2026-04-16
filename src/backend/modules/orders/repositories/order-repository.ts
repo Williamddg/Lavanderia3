@@ -7,6 +7,7 @@ const baseOrderSelection = [
   'o.client_id',
   'o.status_id',
   'o.notes',
+  'o.discount_reason',
   'o.subtotal',
   'o.discount_total',
   'o.total',

@@ -1,8 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@renderer/services/api';
 import { PageHeader } from '@renderer/ui/components';
+import type { OrderInput } from '@shared/types';
 import { OrderForm } from '../components/OrderForm';
+
+const ORDER_DRAFT_STORAGE_KEY = 'lavasuite:new-order-draft';
 
 const normalizePhone = (raw?: string | null) => {
   const digits = String(raw ?? '').replace(/\D/g, '');
@@ -89,6 +93,22 @@ Gracias por confiar en nosotros.`;
 export const NewOrderPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [restoredDraft, setRestoredDraft] = useState<OrderInput | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(ORDER_DRAFT_STORAGE_KEY);
+      if (!raw) {
+        setRestoredDraft(null);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as OrderInput;
+      setRestoredDraft(parsed?.items?.length ? parsed : null);
+    } catch {
+      setRestoredDraft(null);
+    }
+  }, []);
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
@@ -103,6 +123,7 @@ export const NewOrderPage = () => {
   const mutation = useMutation({
     mutationFn: api.createOrder,
     onSuccess: async (order) => {
+      window.localStorage.removeItem(ORDER_DRAFT_STORAGE_KEY);
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       await queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -133,7 +154,7 @@ export const NewOrderPage = () => {
         await api.openExternal(url);
       }
 
-      navigate(`/ordenes/${order.id}`);
+      navigate('/ordenes');
     }
   });
 
@@ -141,12 +162,23 @@ export const NewOrderPage = () => {
     <section className="stack-gap">
       <PageHeader
         title="Nueva orden"
-        subtitle="Crea una orden real con múltiples ítems, descuento y saldo."
       />
       <div className="card-panel">
+        {restoredDraft ? (
+          <p className="alert-warning" style={{ marginTop: 0 }}>
+            Se restauró un borrador temporal de la orden anterior.
+          </p>
+        ) : null}
         <OrderForm
           clients={clients}
           catalogs={catalogs}
+          initialDraft={restoredDraft}
+          onDraftRestored={() => {
+            window.localStorage.removeItem(ORDER_DRAFT_STORAGE_KEY);
+          }}
+          onDraftChange={(value) => {
+            window.localStorage.setItem(ORDER_DRAFT_STORAGE_KEY, JSON.stringify(value));
+          }}
           onSubmit={(value) => mutation.mutate(value)}
         />
         {mutation.isError && (

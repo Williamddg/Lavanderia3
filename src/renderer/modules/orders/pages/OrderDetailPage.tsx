@@ -15,6 +15,8 @@ import { currency, dateTime } from '@renderer/utils/format';
 import { PaymentForm } from '@renderer/modules/payments/components/PaymentForm';
 import { OrderForm } from '../components/OrderForm';
 
+const buildOrderDraftStorageKey = (orderId: number) => `lavasuite:order-edit-draft:${orderId}`;
+
 const tabs = ['Resumen', 'Prendas', 'Pagos', 'Facturas', 'Entregas'] as const;
 
 const renderValue = (value?: string | null) => {
@@ -95,6 +97,7 @@ export const OrderDetailPage = () => {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>('Resumen');
   const [paymentModal, setPaymentModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
+  const [restoredEditDraft, setRestoredEditDraft] = useState<any | null>(null);
 
   const [passwordModal, setPasswordModal] = useState(false);
   const [password, setPassword] = useState('');
@@ -154,6 +157,8 @@ export const OrderDetailPage = () => {
   const updateOrderMutation = useMutation({
     mutationFn: (input: any) => api.updateOrder(orderId, input),
     onSuccess: async () => {
+      window.localStorage.removeItem(buildOrderDraftStorageKey(orderId));
+      setRestoredEditDraft(null);
       setEditModal(false);
       await queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -170,9 +175,11 @@ export const OrderDetailPage = () => {
       notes: value,
       dueDate: data.dueDate,
       discountTotal: data.discountTotal ?? 0,
+      discountReason: data.discountReason ?? null,
 
       // 👇 ESTE CAMPO ES CLAVE
       paidAmount: 0,
+      initialPaymentReason: null,
 
       items: data.items.map((item) => ({
         garmentTypeId: item.garmentTypeId,
@@ -231,7 +238,7 @@ export const OrderDetailPage = () => {
       setPendingAction(null);
 
       if (action === 'edit') {
-        setEditModal(true);
+        openEditModal();
         return;
       }
 
@@ -284,6 +291,17 @@ export const OrderDetailPage = () => {
     setPassword('');
     setPasswordError(null);
     setPasswordModal(true);
+  };
+
+  const openEditModal = () => {
+    try {
+      const raw = window.localStorage.getItem(buildOrderDraftStorageKey(orderId));
+      setRestoredEditDraft(raw ? JSON.parse(raw) : null);
+    } catch {
+      setRestoredEditDraft(null);
+    }
+
+    setEditModal(true);
   };
 
   const handleConfirmPassword = async () => {
@@ -624,10 +642,25 @@ export const OrderDetailPage = () => {
         title="Editar orden"
         onClose={() => setEditModal(false)}
       >
+        {restoredEditDraft ? (
+          <p className="alert-warning" style={{ marginTop: 0 }}>
+            Se restauró un borrador temporal de esta edición.
+          </p>
+        ) : null}
         <OrderForm
           clients={clients}
           catalogs={catalogs}
           initialValue={data}
+          initialDraft={restoredEditDraft}
+          onDraftRestored={() => {
+            window.localStorage.removeItem(buildOrderDraftStorageKey(orderId));
+          }}
+          onDraftChange={(value) => {
+            window.localStorage.setItem(
+              buildOrderDraftStorageKey(orderId),
+              JSON.stringify(value)
+            );
+          }}
           hideInitialPaymentFields
           submitLabel="Guardar cambios"
           onSubmit={(value) => updateOrderMutation.mutate(value)}

@@ -51,6 +51,27 @@ textarea {
   display: grid;
   gap: 4px;
   flex: 0 0 auto;
+  justify-items: start;
+}
+
+.brand-logo {
+  width: 100%;
+  max-width: 160px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 8px;
+}
+
+.brand-logo-fallback {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #23303d;
 }
 
 .sidebar-nav {
@@ -141,6 +162,17 @@ textarea {
   padding: 24px 32px 32px;
   min-height: 0;
   overflow: auto;
+}
+
+.sidebar-nav::-webkit-scrollbar,
+.page-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb,
+.page-content::-webkit-scrollbar-thumb {
+  background: rgba(110, 132, 157, 0.45);
+  border-radius: 999px;
 }
 
 .stack-gap {
@@ -333,6 +365,22 @@ textarea.field {
   flex-wrap: wrap;
 }
 
+.recent-preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: white;
+  border: 1px solid #e5ebf1;
+}
+
+.recent-preset-row p {
+  color: #627182;
+  font-size: 0.92rem;
+}
+
 .item-card {
   border: 1px solid #ebf0f4;
   border-radius: 18px;
@@ -352,6 +400,7 @@ textarea.field {
 
 .totals-panel div {
   background: #f7f9fb;
+  border: 1px solid #111;
   border-radius: 14px;
   padding: 16px;
   display: grid;
@@ -1098,4 +1147,85 @@ font-size: 11.5px;
   text-align: center;
   color: #7a8a9a;
   font-size: 0.85rem;
+}
+
+@media (max-width: 1440px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .split-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .item-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .totals-panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1280px) {
+  .app-shell {
+    grid-template-columns: 248px 1fr;
+  }
+
+  .sidebar {
+    padding: 18px 14px;
+  }
+
+  .topbar {
+    padding: 20px 24px 0;
+    align-items: flex-start;
+  }
+
+  .page-content {
+    padding: 20px 24px 24px;
+  }
+
+  .topbar-tools {
+    width: min(100%, 420px);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .compact-field {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .topbar-user {
+    justify-items: start;
+  }
+
+  .brand-logo {
+    max-width: 140px;
+    height: 64px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .form-grid,
+  .item-grid,
+  .summary-grid,
+  .totals-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+  }
+
+  .topbar-tools {
+    width: 100%;
+    max-width: none;
+  }
+
+  .recent-preset-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

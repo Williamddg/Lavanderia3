@@ -95,6 +95,7 @@ export interface OrdersTable {
   branch_id: number | null;
   status_id: number;
   notes: string | null;
+  discount_reason: string | null;
   subtotal: number;
   discount_total: number;
   total: number;
@@ -193,7 +194,7 @@ export interface InvoiceItemsSnapshotTable {
   subtotal: number;
   total: number;
 }
-export interface PaymentsTable { id: Generated<number>; order_id: number; invoice_id: number | null; payment_method_id: number; amount: number; reference: string | null; received_by: number | null; created_at: ColumnType<Date, never, never>; }
+export interface PaymentsTable { id: Generated<number>; order_id: number; invoice_id: number | null; payment_method_id: number; amount: number; reference: string | null; notes: string | null; received_by: number | null; created_at: ColumnType<Date, never, never>; }
 export interface DiscountAuthorizationsTable { id: Generated<number>; order_id: number; authorized_by: number; amount: number; reason: string; created_at: ColumnType<Date, never, never>; }
 export interface CashSessionsTable {
   id: Generated<number>;
