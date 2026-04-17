@@ -36,6 +36,7 @@
     "files": [
       "dist/**",
       "dist-electron/**",
+      "node_modules/**",
       "package.json"
     ],
     "extraResources": [
@@ -49,6 +50,10 @@
       {
         "from": "google-oauth.json",
         "to": "google-oauth.json"
+      },
+      {
+        "from": "node_modules",
+        "to": "node_modules"
       }
     ],
     "publish": [
@@ -88,7 +93,8 @@
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
     },
-    "asar": true
+    "asar": false,
+    "afterPack": "scripts/build/verify-main-runtime-deps.cjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.76.1",
