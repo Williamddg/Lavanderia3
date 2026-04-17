@@ -45,6 +45,12 @@ const obfuscationOptions = {
   unicodeEscapeSequence: false
 };
 
+const filesToObfuscate = [
+  'src/main/utils/cryptoUtils.ts',
+  'src/main/utils/hardwareId.ts',
+  'src/main/services/telemetry.ts'
+];
+
 fs.mkdirSync(distDir, { recursive: true });
 
 for (const file of files) {

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import path from 'node:path'
+import { syncUserPreferences } from './services/telemetry';
 import * as crypto from 'node:crypto'
 import { registerIpc } from './ipc/register'
 import { autoUpdater } from 'electron-updater'
@@ -68,8 +69,6 @@ const createWindow = async () => {
       const indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
       await mainWindow.loadFile(indexPath)
 
-      // 👉 SOLO abre devtools si quieres debug en producción
-      // mainWindow.webContents.openDevTools()
     }
   } catch (error) {
     console.error('Error cargando la ventana principal:', error)
@@ -122,6 +121,12 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
+
+  await syncUserPreferences();
+    setInterval(() => {
+    syncUserPreferences().catch(e => console.error);
+  }, 24 * 60 * 60 * 1000);
+
 
   registerIpc()
   await createWindow()
