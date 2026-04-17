@@ -1,6 +1,5 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import path from 'node:path'
-import { syncUserPreferences } from './services/telemetry';
 import * as crypto from 'node:crypto'
 import { registerIpc } from './ipc/register'
 import { autoUpdater } from 'electron-updater'
@@ -121,13 +120,6 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
-
-  /*
-  await syncUserPreferences();
-    setInterval(() => {
-    syncUserPreferences().catch(e => console.error);
-  }, 24 * 60 * 60 * 1000);
-  */
 
   registerIpc()
   await createWindow()
