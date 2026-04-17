@@ -82,7 +82,9 @@
     "beforeBuild": "scripts/security/dist/electron-before-build.cjs",
     "asarUnpack": [
       "node_modules/mysql2/**",
-      "node_modules/@mysql/**"
+      "node_modules/@mysql/**",
+      "**/*.node",
+      "dist-electron/bin/**"
     ],
     "nsis": {
       "oneClick": false,
