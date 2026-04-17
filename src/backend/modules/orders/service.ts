@@ -205,7 +205,10 @@ export const createOrdersService = (db: Kysely<Database>) => {
       const receivedStatus = await trx
         .selectFrom('order_statuses')
         .select('id')
-        .where('code', 'in', ['RECEIVED', 'CREATED'])
+        .where('code', 'in', ['IN_PROGRESS', 'RECEIVED', 'CREATED'])
+        .orderBy(
+          sql`FIELD(code, 'IN_PROGRESS', 'RECEIVED', 'CREATED')`
+        )
         .orderBy('id')
         .executeTakeFirstOrThrow();
 
@@ -270,7 +273,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
         .values({
           order_id: orderId,
           status_id: receivedStatus.id,
-          notes: 'Orden recibida'
+          notes: 'Orden creada en proceso'
         })
         .execute();
 

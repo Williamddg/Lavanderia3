@@ -17,6 +17,16 @@ import type {
 } from '@shared/types';
 
 declare global {
+  type DesktopPdfPageSize = 'A4' | 'Letter' | 'Legal' | 'Tabloid';
+  type DesktopPdfInput = {
+    defaultFileName?: string;
+    targetDir?: string | null;
+    subfolder?: string | null;
+    pageSize?: DesktopPdfPageSize;
+    landscape?: boolean;
+    preferCssPageSize?: boolean;
+  };
+
   interface Window {
     desktopApi: {
       getPlatform: () => NodeJS.Platform;
@@ -82,8 +92,8 @@ declare global {
       restartApp: () => Promise<unknown>;
       quitApp: () => Promise<unknown>;
       openExternal: (payload: ExternalLinkPayload) => Promise<unknown>;
-      printToPdf: (input?: { defaultFileName?: string; pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid'; landscape?: boolean }) => Promise<unknown>;
-      printToPdfAuto: (input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null; pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid'; landscape?: boolean }) => Promise<unknown>;
+      printToPdf: (input?: Omit<DesktopPdfInput, 'targetDir' | 'subfolder'>) => Promise<unknown>;
+      printToPdfAuto: (input?: DesktopPdfInput) => Promise<unknown>;
       selectDirectory: () => Promise<unknown>;
       setupCreateDatabase: (input: SetupRootConnectionInput) => Promise<unknown>;
       setupInitializeSchema: (input: SetupRootConnectionInput) => Promise<unknown>;

@@ -154,7 +154,7 @@ export const NewOrderPage = () => {
         await api.openExternal(url);
       }
 
-      navigate('/ordenes');
+      navigate(`/facturas/${order.id}?autoSave=1&autoPrint=1`);
     }
   });
 

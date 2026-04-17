@@ -52,6 +52,20 @@ const wrap =
   };
 
 export const registerIpc = () => {
+  const resolvePdfOptions = (input?: {
+    pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid';
+    landscape?: boolean;
+    preferCssPageSize?: boolean;
+  }) => {
+    const preferCSSPageSize = Boolean(input?.preferCssPageSize);
+    return {
+      printBackground: true,
+      preferCSSPageSize,
+      ...(preferCSSPageSize ? {} : { pageSize: input?.pageSize ?? 'A4' }),
+      landscape: Boolean(input?.landscape)
+    };
+  };
+
   const publicChannels = new Set([
     'app:health',
     'setup:create-database',
@@ -324,6 +338,7 @@ export const registerIpc = () => {
         defaultFileName?: string;
         pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid';
         landscape?: boolean;
+        preferCssPageSize?: boolean;
       }
     ) => {
     try {
@@ -342,10 +357,7 @@ export const registerIpc = () => {
 
       await ensurePrintableFrameReady(webContents);
       const pdf = await webContents.printToPDF({
-        printBackground: true,
-        preferCSSPageSize: false,
-        pageSize: input?.pageSize ?? 'A4',
-        landscape: Boolean(input?.landscape)
+        ...resolvePdfOptions(input)
       });
 
       await writeFile(filePath, pdf);
@@ -370,6 +382,7 @@ export const registerIpc = () => {
         subfolder?: string | null;
         pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid';
         landscape?: boolean;
+        preferCssPageSize?: boolean;
       }
     ) => {
       try {
@@ -385,10 +398,7 @@ export const registerIpc = () => {
 
         await ensurePrintableFrameReady(webContents);
         const pdf = await webContents.printToPDF({
-          printBackground: true,
-          preferCSSPageSize: false,
-          pageSize: input?.pageSize ?? 'A4',
-          landscape: Boolean(input?.landscape)
+          ...resolvePdfOptions(input)
         });
 
         await writeFile(outputPath, pdf);

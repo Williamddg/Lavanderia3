@@ -63,6 +63,16 @@ const callDesktopApi = <T>(fnName: string, ...args: any[]): Promise<T> => {
   return fn(...args) as Promise<T>;
 };
 
+type DesktopPdfPageSize = 'A4' | 'Letter' | 'Legal' | 'Tabloid';
+type DesktopPdfInput = {
+  defaultFileName?: string;
+  targetDir?: string | null;
+  subfolder?: string | null;
+  pageSize?: DesktopPdfPageSize;
+  landscape?: boolean;
+  preferCssPageSize?: boolean;
+};
+
 export const api = {
   connectDriveBackup: () =>
     unwrap<ConnectDriveResult>(window.desktopApi.connectDriveBackup()),
@@ -116,15 +126,9 @@ export const api = {
   restartApp: () => unwrap<{ restarted: boolean }>(window.desktopApi.restartApp()),
   quitApp: () => unwrap<{ quit: boolean }>(window.desktopApi.quitApp()),
   openExternal: (url: string) => unwrap(window.desktopApi.openExternal({ url })),
-  printToPdf: (defaultFileName?: string) =>
-    unwrap<{ saved: boolean; path: string | null }>(window.desktopApi.printToPdf({ defaultFileName, pageSize: 'A4', landscape: false })),
-  printToPdfAuto: (input: {
-    defaultFileName?: string;
-    targetDir?: string | null;
-    subfolder?: string | null;
-    pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid';
-    landscape?: boolean;
-  }) =>
+  printToPdf: (input?: Omit<DesktopPdfInput, 'targetDir' | 'subfolder'>) =>
+    unwrap<{ saved: boolean; path: string | null }>(window.desktopApi.printToPdf(input)),
+  printToPdfAuto: (input: DesktopPdfInput) =>
     unwrap<{ saved: boolean; path: string | null }>(callDesktopApi('printToPdfAuto', input)),
   selectDirectory: () =>
     unwrap<{ selected: boolean; path: string | null }>(callDesktopApi('selectDirectory')),

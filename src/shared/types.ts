@@ -255,6 +255,7 @@ export type Invoice = {
   id: number;
   invoiceNumber: string;
   orderId: number;
+  orderNumber: string;
   clientId: number;
   clientName: string;
   clientPhone: string | null;
@@ -268,7 +269,9 @@ export type Invoice = {
   balanceDue: number;
   ticketCode: string;
   companyName: string | null;
+  companyLegalName: string | null;
   companyPhone: string | null;
+  companyEmail: string | null;
   companyAddress: string | null;
   companyNit: string | null;
   companyLogo: string | null;

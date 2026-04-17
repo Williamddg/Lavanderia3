@@ -37,8 +37,8 @@ export const createReportsService = (db: Kysely<Database>) => ({
       .where('p.created_at', '<=', endOfDay(rangeTo));
 
     const expenseFiltered = expenseQuery
-      .where('e.expense_date', '>=', new Date(rangeFrom))
-      .where('e.expense_date', '<=', new Date(rangeTo));
+      .where(sql<boolean>`e.expense_date >= STR_TO_DATE(${rangeFrom}, '%Y-%m-%d')`)
+      .where(sql<boolean>`e.expense_date <= STR_TO_DATE(${rangeTo}, '%Y-%m-%d')`);
 
     const paymentOutFiltered = paymentOutQuery
       .where('cm.created_at', '>=', startOfDay(rangeFrom))
