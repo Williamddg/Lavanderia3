@@ -122,11 +122,12 @@ app.whenReady().then(async () => {
     return
   }
 
+  /*
   await syncUserPreferences();
     setInterval(() => {
     syncUserPreferences().catch(e => console.error);
   }, 24 * 60 * 60 * 1000);
-
+  */
 
   registerIpc()
   await createWindow()
