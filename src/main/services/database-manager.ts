@@ -1,9 +1,11 @@
-import mysql from 'mysql2/promise';
+import { loadMysqlPromiseRuntime } from '../../shared/mysql-runtime-loader.js';
 import type { Kysely } from 'kysely';
 import { createDb } from '../../backend/db/connection.js';
 import { runMigrations } from '../../backend/db/migrator.js';
 import type { Database } from '../../backend/db/schema.js';
 import type { DbConnectionConfig, HealthStatus } from '../../shared/types.js';
+
+const mysql = loadMysqlPromiseRuntime();
 
 const ElectronStore = require('electron-store').default;
 const store = new ElectronStore({

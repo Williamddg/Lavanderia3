@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "lint": "eslint . --ext .ts,.tsx",
     "start": "electron .",
-    "postinstall": "electron-rebuild -f -a x64 && npm run masterkey:prepare"
+    "postinstall": "npm run masterkey:prepare"
   },
   "build": {
     "appId": "com.sistetecni.lavanderia",
@@ -45,10 +45,6 @@
         "filter": [
           "**/*.sql"
         ]
-      },
-      {
-        "from": "resources/bin",
-        "to": "bin"
       },
       {
         "from": "google-oauth.json",
@@ -81,8 +77,6 @@
     },
     "beforeBuild": "scripts/security/dist/electron-before-build.cjs",
     "asarUnpack": [
-      "node_modules/mysql2/**",
-      "node_modules/@mysql/**",
       "**/*.node",
       "dist-electron/bin/**"
     ],
@@ -93,7 +87,8 @@
       "createStartMenuShortcut": true,
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
-    }
+    },
+    "asar": true
   },
   "dependencies": {
     "@tanstack/react-query": "^5.76.1",
@@ -120,7 +115,6 @@
     "concurrently": "^9.1.2",
     "electron": "^35.1.5",
     "electron-builder": "^26.8.1",
-    "electron-rebuild": "^3.2.9",
     "eslint": "^9.24.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
