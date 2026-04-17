@@ -18,6 +18,11 @@ export const getCurrentSessionUser = (): SessionUser | null =>
     : null;
 
 export const getCurrentSessionUserId = (): number | null => currentSessionUser?.id ?? null;
+export const getCurrentSessionUserRoleId = (): number | null => currentSessionUser?.roleId ?? null;
 
 export const getCurrentSessionUserName = (): string | null =>
   currentSessionUser?.displayName ?? currentSessionUser?.username ?? null;
+
+export const clearCurrentSessionUser = () => {
+  currentSessionUser = null;
+};

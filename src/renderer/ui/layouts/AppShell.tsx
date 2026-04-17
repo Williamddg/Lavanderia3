@@ -129,7 +129,15 @@ export const AppShell = ({ user, onLogout }: AppShellProps) => {
           <button
             className="button button-secondary"
             type="button"
-            onClick={onLogout}
+            onClick={async () => {
+              try {
+                await api.logout();
+              } catch {
+                // No bloquear cierre local por fallos del proceso principal.
+              } finally {
+                onLogout();
+              }
+            }}
           >
             Cerrar sesión
           </button>

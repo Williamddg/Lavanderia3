@@ -1,10 +1,51 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import path from 'node:path'
+import * as crypto from 'node:crypto'
 import { registerIpc } from './ipc/register'
 import { autoUpdater } from 'electron-updater'
-import { MASTER_BUILD_AUTHORIZED } from './generated/master-build-auth'
+import {
+  MASTER_BUILD_AUTHORIZED,
+  MASTER_BUILD_GENERATED_AT,
+  MASTER_BUILD_MAC,
+  MASTER_BUILD_NONCE,
+  MASTER_BUILD_SALT,
+  MASTER_BUILD_TOKEN
+} from './generated/master-build-auth'
 
 const isDev = !app.isPackaged
+
+const buildRuntimeSecret = () => {
+  const xorKey = (11 * 2) - 3
+  const encoded = [81, 124, 107, 46, 111, 60, 124, 77, 109, 62, 79, 104, 115, 105, 44, 112, 120]
+  return String.fromCharCode(...encoded.map((value, index) => (value ^ xorKey) - (index % 3)))
+}
+
+const hmacSha256 = (key: string, value: string) =>
+  crypto.createHmac('sha256', key).update(value).digest('hex')
+
+const detectRuntimeDebugging = () => {
+  const flags = process.execArgv.join(' ').toLowerCase()
+  const envFlags = String(process.env.NODE_OPTIONS ?? '').toLowerCase()
+  const hasInspector =
+    flags.includes('--inspect') ||
+    flags.includes('--debug') ||
+    envFlags.includes('--inspect') ||
+    envFlags.includes('--debug')
+  const hasElectronDebugPort = app.commandLine.hasSwitch('remote-debugging-port')
+  return hasInspector || hasElectronDebugPort
+}
+
+const isBuildTokenValid = () => {
+  if (!MASTER_BUILD_AUTHORIZED) return false
+  if (!MASTER_BUILD_TOKEN || !MASTER_BUILD_SALT || !MASTER_BUILD_NONCE || !MASTER_BUILD_MAC) {
+    return false
+  }
+
+  const secret = buildRuntimeSecret()
+  const payload = `${MASTER_BUILD_TOKEN}|${MASTER_BUILD_SALT}|${MASTER_BUILD_NONCE}|${MASTER_BUILD_GENERATED_AT}`
+  const expectedMac = hmacSha256(secret, payload)
+  return expectedMac === MASTER_BUILD_MAC
+}
 
 const createWindow = async () => {
   const mainWindow = new BrowserWindow({
@@ -44,13 +85,39 @@ const createWindow = async () => {
       `)}`
     )
   }
+
+  const quitUnauthorized = async () => {
+    await dialog.showErrorBox(
+      'Aplicación no autorizada',
+      'No fue posible validar la integridad de esta aplicación.'
+    )
+    app.quit()
+  }
+
+  mainWindow.webContents.on('devtools-opened', () => {
+    void quitUnauthorized()
+  })
+
+  const watchdog = setInterval(() => {
+    if (mainWindow.isDestroyed()) {
+      clearInterval(watchdog)
+      return
+    }
+    if (mainWindow.webContents.isDevToolsOpened() || detectRuntimeDebugging()) {
+      void quitUnauthorized()
+    }
+  }, 1200)
+
+  mainWindow.on('closed', () => {
+    clearInterval(watchdog)
+  })
 }
 
 app.whenReady().then(async () => {
-  if (!MASTER_BUILD_AUTHORIZED) {
+  if (!isBuildTokenValid() || detectRuntimeDebugging()) {
     await dialog.showErrorBox(
-      'Ejecución bloqueada',
-      'Este binario no fue generado con validación de clave maestra.'
+      'Aplicación no autorizada',
+      'No fue posible validar la autorización de ejecución.'
     )
     app.quit()
     return

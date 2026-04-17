@@ -92,6 +92,7 @@ declare global {
       ) => () => void;
       setupFinalize: (input: SetupFinalizeInput) => Promise<unknown>;
       login: (input: LoginInput) => Promise<unknown>;
+      logout: () => Promise<unknown>;
       getCompanySettings: () => Promise<unknown>;
 
       listClients: () => Promise<unknown>;

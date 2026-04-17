@@ -6,6 +6,7 @@ import {
   getCurrentSessionUserId,
   getCurrentSessionUserName
 } from '../../../main/services/session-context.js';
+import { canReceiveDelivery } from '../orders/security/check-order-status.js';
 
 const schema = z.object({
   orderId: z.number().positive(),
@@ -57,7 +58,7 @@ export const createDeliveriesService = (db: Kysely<Database>) => ({
       .where('o.id', '=', parsed.orderId)
       .executeTakeFirstOrThrow();
 
-    if (order.status_code !== 'READY' && order.status_code !== 'READY_FOR_DELIVERY') {
+    if (!canReceiveDelivery(order.status_code)) {
       throw new Error('La orden no está lista para entrega.');
     }
 

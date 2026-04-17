@@ -20,7 +20,22 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }]
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "BinaryExpression[operator='+'] Literal[value=/\\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER)\\b/i]",
+          message:
+            'No concatenes strings SQL manualmente. Usa query builder parametrizado (Kysely) o placeholders.'
+        },
+        {
+          selector:
+            "TemplateLiteral:not(TaggedTemplateExpression > TemplateLiteral) > TemplateElement[value.raw=/\\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER)\\b/i]",
+          message:
+            'Evita SQL literal crudo en templates; utiliza consultas parametrizadas o Kysely.'
+        }
+      ]
     }
   }
 );

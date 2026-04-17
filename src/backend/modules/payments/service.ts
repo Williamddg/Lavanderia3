@@ -6,6 +6,7 @@ import {
   getCurrentSessionUserId,
   getCurrentSessionUserName
 } from '../../../main/services/session-context.js';
+import { checkOrderStatus } from '../orders/security/check-order-status.js';
 
 const schema = z.object({
   orderId: z.number().positive(),
@@ -70,10 +71,21 @@ export const createPaymentsService = (db: Kysely<Database>) => {
     }
 
     const order = await db
-      .selectFrom('orders')
-      .selectAll()
-      .where('id', '=', parsed.orderId)
+      .selectFrom('orders as o')
+      .innerJoin('order_statuses as os', 'os.id', 'o.status_id')
+      .select([
+        'o.id',
+        'o.order_number',
+        'o.status_id',
+        'o.total',
+        'o.paid_total',
+        'o.balance_due',
+        sql<string>`os.code`.as('status_code')
+      ])
+      .where('o.id', '=', parsed.orderId)
       .executeTakeFirstOrThrow();
+
+    checkOrderStatus(order.status_code, 'registrar pago');
 
     const newPaidTotal = Number(order.paid_total) + parsed.amount;
     const newBalance = Math.max(0, Number(order.total) - newPaidTotal);
@@ -258,10 +270,21 @@ export const createPaymentsService = (db: Kysely<Database>) => {
     }
 
     const order = await db
-      .selectFrom('orders')
-      .selectAll()
-      .where('id', '=', input.orderId)
+      .selectFrom('orders as o')
+      .innerJoin('order_statuses as os', 'os.id', 'o.status_id')
+      .select([
+        'o.id',
+        'o.order_number',
+        'o.status_id',
+        'o.total',
+        'o.paid_total',
+        'o.balance_due',
+        sql<string>`os.code`.as('status_code')
+      ])
+      .where('o.id', '=', input.orderId)
       .executeTakeFirstOrThrow();
+
+    checkOrderStatus(order.status_code, 'registrar pago');
 
     const balanceDue = Number(order.balance_due);
     const amountToApply = Math.min(totalAmount, balanceDue);

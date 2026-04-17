@@ -137,6 +137,7 @@ export const api = {
   setupFinalize: (input: SetupFinalizeInput) =>
     unwrap<SetupFinalizeResult>(window.desktopApi.setupFinalize(input)),
   login: (input: LoginInput) => unwrap<SessionUser>(window.desktopApi.login(input)),
+  logout: () => unwrap<{ success: true }>(window.desktopApi.logout()),
   companySettings: () => unwrap<CompanySettings | null>(window.desktopApi.getCompanySettings()),
 
   verifyPassword: (password: string) =>

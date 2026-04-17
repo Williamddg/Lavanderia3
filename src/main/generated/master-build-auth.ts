@@ -1,3 +1,7 @@
-export const MASTER_BUILD_AUTHORIZED = true;
-export const MASTER_BUILD_SIGNATURE = '1b101f842bcbeb7f5c52f8d6c9efb2ecc4f8ef9adefde7c566df33a3a4520909';
-export const MASTER_BUILD_GENERATED_AT = '2026-04-17T01:35:00.077Z';
+export const MASTER_BUILD_AUTHORIZED = false;
+export const MASTER_BUILD_SIGNATURE = '';
+export const MASTER_BUILD_GENERATED_AT = '';
+export const MASTER_BUILD_TOKEN = '';
+export const MASTER_BUILD_SALT = '';
+export const MASTER_BUILD_NONCE = '';
+export const MASTER_BUILD_MAC = '';

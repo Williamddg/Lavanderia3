@@ -71,6 +71,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
   setupFinalize: (input: SetupFinalizeInput) =>
     ipcRenderer.invoke('setup:finalize', input),
   login: (input: LoginInput) => ipcRenderer.invoke('auth:login', input),
+  logout: () => ipcRenderer.invoke('auth:logout'),
   getCompanySettings: () => ipcRenderer.invoke('settings:company'),
 
   listClients: () => ipcRenderer.invoke('clients:list'),

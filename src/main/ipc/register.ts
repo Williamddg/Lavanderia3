@@ -19,7 +19,11 @@ import { createAuditService } from '../../backend/modules/audit/service.js';
 import { printerService } from '../services/printer-service.js';
 import { backupService } from '../services/backup-service.js';
 import { initialSetupService } from '../services/initial-setup-service.js';
-import { setCurrentSessionUser } from '../services/session-context.js';
+import {
+  clearCurrentSessionUser,
+  getCurrentSessionUser,
+  setCurrentSessionUser
+} from '../services/session-context.js';
 
 import type {
   BatchPaymentInput,
@@ -48,6 +52,99 @@ const wrap =
   };
 
 export const registerIpc = () => {
+  const publicChannels = new Set([
+    'app:health',
+    'setup:create-database',
+    'setup:initialize-schema',
+    'setup:finalize',
+    'auth:login'
+  ]);
+
+  const adminOnlyPrefixes = ['services:', 'users:', 'audit:'];
+  const adminOnlyChannels = new Set([
+    'settings:update-company',
+    'settings:get-order-protection-password',
+    'settings:update-order-protection-password',
+    'settings:update-pdf-output-dir',
+    'reports:summary',
+    'backup:connect-drive',
+    'backup:upload-drive',
+    'backup:list'
+  ]);
+
+  const logDeniedAttempt = async (channel: string, reason: string) => {
+    try {
+      const db = await databaseManager.getDb();
+      const user = getCurrentSessionUser();
+      await db
+        .insertInto('audit_logs')
+        .values({
+          user_id: user?.id ?? null,
+          action: 'SECURITY_ACCESS_DENIED',
+          entity_type: 'ipc',
+          entity_id: channel,
+          details_json: JSON.stringify({
+            reason,
+            roleId: user?.roleId ?? null,
+            roleName: user?.roleName ?? null
+          })
+        })
+        .execute();
+    } catch {
+      // Ignorar errores de auditoría de seguridad para no romper el flujo.
+    }
+  };
+
+  const isSuspiciousValue = (value: unknown): boolean => {
+    if (typeof value === 'string') {
+      const text = value.trim().toLowerCase();
+      if (!text) return false;
+      return (
+        /(\bunion\b\s+\bselect\b)|(\bdrop\b\s+\btable\b)|(\binsert\b\s+\binto\b)|(\bdelete\b\s+\bfrom\b)|(\bor\b\s+1=1)|(--\s)/i.test(
+          text
+        )
+      );
+    }
+    if (Array.isArray(value)) return value.some((item) => isSuspiciousValue(item));
+    if (value && typeof value === 'object') {
+      return Object.values(value as Record<string, unknown>).some((item) =>
+        isSuspiciousValue(item)
+      );
+    }
+    return false;
+  };
+
+  const originalHandle = ipcMain.handle.bind(ipcMain);
+  ipcMain.handle = ((channel: string, listener: (...args: any[]) => any) => {
+    return originalHandle(channel, async (event: unknown, ...args: any[]) => {
+      const isPublic = publicChannels.has(channel);
+      const needsAdmin =
+        adminOnlyChannels.has(channel) ||
+        adminOnlyPrefixes.some((prefix) => channel.startsWith(prefix));
+      const currentUser = getCurrentSessionUser();
+
+      if (!isPublic && !currentUser) {
+        await logDeniedAttempt(channel, 'unauthenticated');
+        return { success: false, error: 'Debes iniciar sesión para ejecutar esta acción.' };
+      }
+
+      if (needsAdmin && Number(currentUser?.roleId ?? 0) !== 1) {
+        await logDeniedAttempt(channel, 'forbidden_non_admin');
+        return { success: false, error: 'No tienes permisos para esta acción.' };
+      }
+
+      if (isSuspiciousValue(args)) {
+        await logDeniedAttempt(channel, 'suspicious_payload');
+        return {
+          success: false,
+          error: 'Entrada inválida detectada por política de seguridad.'
+        };
+      }
+
+      return listener(event as any, ...args);
+    });
+  }) as typeof ipcMain.handle;
+
   const ensurePrintableFrameReady = async (webContents: Electron.WebContents) => {
     // Wait for fonts + 4 animation frames + fixed delay.
     // On Mac, JsBarcode SVG useEffect may lag behind the first paint,
@@ -367,6 +464,14 @@ export const registerIpc = () => {
       const session = await createAuthService(await databaseManager.getDb()).login(input);
       setCurrentSessionUser(session);
       return session;
+    })
+  );
+
+  ipcMain.handle(
+    'auth:logout',
+    wrap(async () => {
+      clearCurrentSessionUser();
+      return { success: true };
     })
   );
 
