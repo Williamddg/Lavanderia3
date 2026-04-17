@@ -1,15 +1,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const REQUIRED_MAIN_DEPS = ['kysely', 'mysql2', 'electron-store', 'bcryptjs', 'zod', 'dayjs'];
-
-const depExists = (dep, searchRoots) => {
-  return searchRoots.some((root) => fs.existsSync(path.join(root, dep, 'package.json')));
-};
+const REQUIRED_MAIN_DEPS = [
+  'kysely',
+  'mysql2',
+  'electron-store',
+  'bcryptjs',
+  'zod',
+  'dayjs'
+];
 
 module.exports = async function verifyMainRuntimeDeps(context) {
-  const resourcesDir = path.join(context.appOutDir, 'resources');
-  const appDir = path.join(resourcesDir, 'app');
+  const appDir = path.join(context.appOutDir, 'resources', 'app');
   const distElectronMain = path.join(appDir, 'dist-electron', 'main', 'main.js');
 
   if (!fs.existsSync(distElectronMain)) {
@@ -18,12 +20,10 @@ module.exports = async function verifyMainRuntimeDeps(context) {
     );
   }
 
-  const searchRoots = [
-    path.join(appDir, 'node_modules'),
-    path.join(resourcesDir, 'node_modules')
-  ];
-
-  const missing = REQUIRED_MAIN_DEPS.filter((dep) => !depExists(dep, searchRoots));
+  const missing = REQUIRED_MAIN_DEPS.filter((dep) => {
+    const depPkg = path.join(appDir, 'node_modules', dep, 'package.json');
+    return !fs.existsSync(depPkg);
+  });
 
   if (missing.length > 0) {
     throw new Error(
@@ -31,7 +31,5 @@ module.exports = async function verifyMainRuntimeDeps(context) {
     );
   }
 
-  console.log(
-    `[PACK-CHECK] OK runtime deps main en: ${searchRoots.join(' | ')}`
-  );
+  console.log(`[PACK-CHECK] OK runtime deps main: ${REQUIRED_MAIN_DEPS.join(', ')}`);
 };

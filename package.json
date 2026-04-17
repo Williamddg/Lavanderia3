@@ -93,6 +93,7 @@
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
     },
+    "asar": false,
     "afterPack": "scripts/build/verify-main-runtime-deps.cjs"
   },
   "dependencies": {
