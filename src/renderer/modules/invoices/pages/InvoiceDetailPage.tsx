@@ -6,6 +6,7 @@ import { Button, PageHeader } from '@renderer/ui/components';
 import { currency, dateTime } from '@renderer/utils/format';
 import { Barcode } from '@renderer/ui/components/Barcode';
 import { showToast } from '@renderer/utils/toast';
+import type { SessionUser } from '@shared/types';
 
 const renderValue = (value?: string | null) => {
   const text = String(value ?? '').trim();
@@ -34,7 +35,7 @@ const normalizeBarcode = (value?: string | number | null) =>
     .trim()
     .toUpperCase();
 
-export const InvoiceDetailPage = () => {
+export const InvoiceDetailPage = ({ user }: { user: SessionUser }) => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -83,8 +84,9 @@ export const InvoiceDetailPage = () => {
       defaultFileName: pdfFileName,
       targetDir: pdfOutputDir ?? null,
       subfolder: saveSubfolder,
+      pageSize: 'A4',
       landscape: false,
-      preferCssPageSize: true
+      preferCssPageSize: false
     });
   };
 
@@ -238,7 +240,7 @@ export const InvoiceDetailPage = () => {
           <p><strong>Fecha:</strong> {dateTime(data.createdAt)}</p>
           <p><strong>Fecha promesa:</strong> {renderDateOnly(data.dueDate)}</p>
           <p><strong>Estado:</strong> {Number(data.balanceDue) > 0 ? 'Con saldo' : 'Pagada'}</p>
-          <p><strong>Generado por:</strong> {renderValue(data.generatedBy || 'Usuario del sistema')}</p>
+          <p><strong>Generado por:</strong> {renderValue(user.displayName || user.username)}</p>
         </div>
 
         <div className="thermal-divider" />
@@ -404,7 +406,7 @@ export const InvoiceDetailPage = () => {
 
           .thermal-order-row h3 {
             margin: 0;
-            font-size: 14px; /* opcional */
+            font-size: 14px;
           }
 
           .thermal-item {
@@ -476,16 +478,31 @@ export const InvoiceDetailPage = () => {
 
           @media print {
             @page {
-              size: 80mm auto;
-              margin: 0;
+              size: A4 portrait;
+              margin: 10mm;
             }
 
             html,
             body {
-              width: 80mm;
+              width: auto !important;
+              min-width: 0 !important;
+              height: auto !important;
               margin: 0 !important;
               padding: 0 !important;
               background: #fff !important;
+              overflow: visible !important;
+            }
+
+            #root,
+            .app-shell,
+            .page-content {
+              width: auto !important;
+              height: auto !important;
+              min-height: 0 !important;
+              overflow: visible !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              display: block !important;
             }
 
             .no-print {
@@ -493,8 +510,10 @@ export const InvoiceDetailPage = () => {
             }
 
             .invoice-page {
+              display: block !important;
               margin: 0 !important;
               padding: 0 !important;
+              overflow: visible !important;
             }
 
             .thermal-invoice {
@@ -502,10 +521,20 @@ export const InvoiceDetailPage = () => {
               max-width: 76mm !important;
               margin: 0 auto !important;
               padding: 3mm 2.5mm 4mm !important;
+              overflow: visible !important;
+              break-inside: auto !important;
+              page-break-inside: auto !important;
             }
 
             .thermal-logo {
               filter: none !important;
+            }
+
+            .thermal-item,
+            .thermal-section,
+            .thermal-totals,
+            .thermal-barcode {
+              overflow: visible !important;
             }
           }
         `}

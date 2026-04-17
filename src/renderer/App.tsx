@@ -71,7 +71,7 @@ export default function App() {
           <Route path="/ordenes/:orderId" element={<OrderDetailPage />} />
           <Route path="/pagos" element={<PaymentsPage />} />
           <Route path="/facturacion" element={<InvoicesPage />} />
-          <Route path="/facturas/:orderId" element={<InvoiceDetailPage />} />
+          <Route path="/facturas/:orderId" element={<InvoiceDetailPage user={user} />} />
           <Route path="/caja" element={<CashPage />} />
           <Route path="/entregas" element={<DeliveriesPage />} />
           <Route path="/gastos" element={<ExpensesPage />} />
