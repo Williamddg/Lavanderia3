@@ -48,12 +48,12 @@
         ]
       },
       {
-        "from": "resources/bin",
-        "to": "bin"
-      },
-      {
         "from": "google-oauth.json",
         "to": "google-oauth.json"
+      },
+      {
+        "from": "node_modules",
+        "to": "node_modules"
       }
     ],
     "publish": [
