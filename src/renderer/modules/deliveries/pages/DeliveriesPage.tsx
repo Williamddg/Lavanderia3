@@ -210,9 +210,19 @@ export const DeliveriesPage = () => {
     });
   }, [orders]);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    if (exportMode) {
+      html.classList.add('deliveries-export-print');
+    } else {
+      html.classList.remove('deliveries-export-print');
+    }
+    return () => html.classList.remove('deliveries-export-print');
+  }, [exportMode]);
+
   const exportSectionToPdf = async (mode: 'due-today' | 'ready' | 'active-all', fileName: string) => {
     setExportMode(mode);
-    await new Promise((resolve) => window.setTimeout(resolve, 60));
+    await new Promise((resolve) => window.setTimeout(resolve, 180));
     try {
       const result = await api.printToPdfAuto({
         defaultFileName: fileName,
@@ -362,7 +372,7 @@ export const DeliveriesPage = () => {
 
       {/* 1. Prometidas para hoy (aún en proceso) */}
       <div
-        className="card-panel stack-gap"
+        className="card-panel stack-gap delivery-export-section"
         style={{ display: exportMode && exportMode !== 'due-today' ? 'none' : 'block' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
@@ -396,7 +406,7 @@ export const DeliveriesPage = () => {
 
       {/* 2. Listas para entregar */}
       <div
-        className="card-panel stack-gap"
+        className="card-panel stack-gap delivery-export-section"
         style={{ display: exportMode && exportMode !== 'ready' ? 'none' : 'block' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
@@ -447,7 +457,7 @@ export const DeliveriesPage = () => {
 
       {/* 4. Activas en lavandería — al final */}
       <div
-        className="card-panel stack-gap"
+        className="card-panel stack-gap delivery-export-section"
         style={{ display: exportMode && exportMode !== 'active-all' ? 'none' : 'block' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
@@ -532,6 +542,95 @@ export const DeliveriesPage = () => {
           {formError && <p className="error-text">{formError}</p>}
         </div>
       </Modal>
+
+      <style>
+        {`
+          @media print {
+            @page {
+              size: A4 portrait;
+              margin: 1.2cm;
+            }
+
+            html.deliveries-export-print,
+            html.deliveries-export-print body,
+            html.deliveries-export-print #root {
+              width: auto !important;
+              height: auto !important;
+              min-height: 0 !important;
+              overflow: visible !important;
+              background: #fff !important;
+            }
+
+            html.deliveries-export-print .app-shell {
+              display: block !important;
+              width: auto !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
+
+            html.deliveries-export-print .sidebar,
+            html.deliveries-export-print .topbar,
+            html.deliveries-export-print .no-print,
+            html.deliveries-export-print .modal-overlay {
+              display: none !important;
+            }
+
+            html.deliveries-export-print .page-content {
+              padding: 0 !important;
+              margin: 0 !important;
+              width: auto !important;
+              max-width: none !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
+
+            html.deliveries-export-print .stack-gap {
+              gap: 10px !important;
+            }
+
+            html.deliveries-export-print .card-panel {
+              border-radius: 10px !important;
+              box-shadow: none !important;
+              padding: 12px !important;
+              overflow: visible !important;
+            }
+
+            html.deliveries-export-print .delivery-export-section {
+              break-inside: auto !important;
+              page-break-inside: auto !important;
+            }
+
+            html.deliveries-export-print h3,
+            html.deliveries-export-print p,
+            html.deliveries-export-print span,
+            html.deliveries-export-print strong {
+              word-break: normal !important;
+              overflow-wrap: break-word !important;
+              white-space: normal !important;
+            }
+
+            html.deliveries-export-print table {
+              width: 100% !important;
+              table-layout: fixed !important;
+              border-collapse: collapse !important;
+            }
+
+            html.deliveries-export-print th,
+            html.deliveries-export-print td {
+              padding: 6px 8px !important;
+              vertical-align: top !important;
+              word-break: break-word !important;
+              overflow-wrap: anywhere !important;
+              white-space: normal !important;
+            }
+
+            html.deliveries-export-print tr {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
+          }
+        `}
+      </style>
     </section>
   );
 };
