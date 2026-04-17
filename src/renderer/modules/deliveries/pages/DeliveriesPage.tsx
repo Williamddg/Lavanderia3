@@ -81,7 +81,7 @@ export const DeliveriesPage = () => {
   const [form, setForm] = useState<DeliveryInput>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
   const [modalOrderFilter, setModalOrderFilter] = useState('');
-  const [exportMode, setExportMode] = useState<'due-today' | 'ready' | 'active-all' | null>(null);
+  const [exportMode, setExportMode] = useState<'due-today' | 'ready' | 'delivered-today' | 'active-all' | null>(null);
 
   const requestedOrderId = Number(searchParams.get('orderId') || 0);
   const shouldOpenFromOrder = searchParams.get('open') === '1';
@@ -220,7 +220,10 @@ export const DeliveriesPage = () => {
     return () => html.classList.remove('deliveries-export-print');
   }, [exportMode]);
 
-  const exportSectionToPdf = async (mode: 'due-today' | 'ready' | 'active-all', fileName: string) => {
+  const exportSectionToPdf = async (
+    mode: 'due-today' | 'ready' | 'delivered-today' | 'active-all',
+    fileName: string
+  ) => {
     setExportMode(mode);
     await new Promise((resolve) => window.setTimeout(resolve, 180));
     try {
@@ -345,7 +348,7 @@ export const DeliveriesPage = () => {
           <div className="row-actions">
             <Button
               variant="secondary"
-              onClick={() => exportSectionToPdf('active-all', `Ordenes-activas-${todayKey}.pdf`)}
+              onClick={() => exportSectionToPdf('active-all', `Entregas-ordenes-activas-${todayKey}.pdf`)}
             >
               Exportar activas PDF
             </Button>
@@ -383,7 +386,7 @@ export const DeliveriesPage = () => {
             </p>
           </div>
           <div className="row-actions no-print">
-            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('due-today', `Entregas-hoy-pendientes-${todayKey}.pdf`)}>
+            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('due-today', `Entregas-prometidas-hoy-en-proceso-${todayKey}.pdf`)}>
               Exportar PDF
             </Button>
             <Button type="button" variant="secondary" onClick={() => printThermalList('Órdenes pendientes para hoy', shouldDeliverTodayRows)}>
@@ -417,7 +420,7 @@ export const DeliveriesPage = () => {
             </p>
           </div>
           <div className="row-actions no-print">
-            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('ready', `Ordenes-listas-para-entregar-${todayKey}.pdf`)}>
+            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('ready', `Entregas-ordenes-listas-para-entregar-${todayKey}.pdf`)}>
               Exportar PDF
             </Button>
             <Button type="button" variant="secondary" onClick={() => printThermalList('Órdenes listas para entregar', readyForDeliveryRows)}>
@@ -438,12 +441,26 @@ export const DeliveriesPage = () => {
       </div>
 
       {/* 3. Entregadas hoy */}
-      <div className="card-panel stack-gap">
-        <div className="stack-gap" style={{ gap: 4 }}>
-          <h3 style={{ margin: 0 }}>Órdenes entregadas hoy</h3>
-          <p style={{ margin: 0, color: '#64748b' }}>
-            Historial de entregas del día (sección final informativa).
-          </p>
+      <div
+        className="card-panel stack-gap delivery-export-section"
+        style={{ display: exportMode && exportMode !== 'delivered-today' ? 'none' : 'block' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <div className="stack-gap" style={{ gap: 4 }}>
+            <h3 style={{ margin: 0 }}>Órdenes entregadas hoy</h3>
+            <p style={{ margin: 0, color: '#64748b' }}>
+              Historial de entregas del día (sección final informativa).
+            </p>
+          </div>
+          <div className="row-actions no-print">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => exportSectionToPdf('delivered-today', `Entregas-ordenes-entregadas-hoy-${todayKey}.pdf`)}
+            >
+              Exportar PDF
+            </Button>
+          </div>
         </div>
         <DataTable
           rows={deliveredTodayRows}
@@ -463,7 +480,7 @@ export const DeliveriesPage = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0 }}>Órdenes activas en lavandería</h3>
           <div className="row-actions no-print">
-            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('active-all', `Ordenes-activas-${todayKey}.pdf`)}>
+            <Button type="button" variant="secondary" onClick={() => exportSectionToPdf('active-all', `Entregas-ordenes-activas-${todayKey}.pdf`)}>
               Exportar PDF
             </Button>
             <Button type="button" variant="secondary" onClick={() => printThermalList('Órdenes activas en lavandería', activeOrdersRows)}>
