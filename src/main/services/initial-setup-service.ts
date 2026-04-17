@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import mysql from 'mysql2/promise';
+import { loadMysqlPromiseRuntime } from '../../shared/mysql-runtime-loader.js';
 import bcrypt from 'bcryptjs';
+import type { Connection } from 'mysql2/promise';
 import { createDb } from '../../backend/db/connection.js';
 import { databaseManager } from './database-manager.js';
 
@@ -15,6 +16,8 @@ import type {
   SetupInitializeSchemaResult,
   SetupRootConnectionInput
 } from '../../shared/types.js';
+
+const mysql = loadMysqlPromiseRuntime();
 
 const SCHEMA_MIGRATIONS_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -90,7 +93,7 @@ class InitialSetupService {
   }
 
   private async columnExists(
-    connection: mysql.Connection,
+    connection: Connection,
     databaseName: string,
     tableName: string,
     columnName: string
@@ -111,7 +114,7 @@ class InitialSetupService {
   }
 
   private async executeStatement(
-    connection: mysql.Connection,
+    connection: Connection,
     databaseName: string,
     statement: string
   ) {
@@ -169,7 +172,7 @@ class InitialSetupService {
     });
   }
 
-  private async getPreferredCollation(connection: mysql.Connection) {
+  private async getPreferredCollation(connection: Connection) {
     const [rows] = await connection.query('SELECT VERSION() AS version');
     const version = Array.isArray(rows) ? String((rows[0] as any)?.version ?? '') : '';
 
