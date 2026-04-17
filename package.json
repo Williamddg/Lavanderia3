@@ -36,6 +36,7 @@
     "files": [
       "dist/**",
       "dist-electron/**",
+      "node_modules/**",
       "package.json"
     ],
     "extraResources": [
@@ -47,12 +48,12 @@
         ]
       },
       {
-        "from": "resources/bin",
-        "to": "bin"
-      },
-      {
         "from": "google-oauth.json",
         "to": "google-oauth.json"
+      },
+      {
+        "from": "node_modules",
+        "to": "node_modules"
       }
     ],
     "publish": [
@@ -81,8 +82,6 @@
     },
     "beforeBuild": "scripts/security/dist/electron-before-build.cjs",
     "asarUnpack": [
-      "node_modules/mysql2/**",
-      "node_modules/@mysql/**",
       "**/*.node",
       "dist-electron/bin/**"
     ],
@@ -93,7 +92,8 @@
       "createStartMenuShortcut": true,
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
-    }
+    },
+    "afterPack": "scripts/build/verify-main-runtime-deps.cjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.76.1",

@@ -1,8 +1,7 @@
 import { app, BrowserWindow, dialog } from 'electron'
+import fs from 'node:fs'
 import path from 'node:path'
 import * as crypto from 'node:crypto'
-import { registerIpc } from './ipc/register'
-import { autoUpdater } from 'electron-updater'
 import {
   MASTER_BUILD_AUTHORIZED,
   MASTER_BUILD_GENERATED_AT,
@@ -13,6 +12,29 @@ import {
 } from './generated/master-build-auth'
 
 const isDev = !app.isPackaged
+
+const configureRuntimeModulePaths = () => {
+  if (!app.isPackaged) return
+
+  const runtimeNodeModules = path.join(process.resourcesPath, 'node_modules')
+  if (!fs.existsSync(runtimeNodeModules)) return
+
+  const delimiter = path.delimiter
+  const currentNodePath = String(process.env.NODE_PATH ?? '')
+    .split(delimiter)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+
+  if (currentNodePath.includes(runtimeNodeModules)) return
+
+  process.env.NODE_PATH = [runtimeNodeModules, ...currentNodePath].join(delimiter)
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const moduleLib = require('node:module') as {
+    Module: { _initPaths: () => void }
+  }
+  moduleLib.Module._initPaths()
+}
 
 const buildRuntimeSecret = () => {
   const xorKey = (11 * 2) - 3
@@ -120,6 +142,12 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
+
+  configureRuntimeModulePaths()
+  const [{ registerIpc }, { autoUpdater }] = await Promise.all([
+    import('./ipc/register'),
+    import('electron-updater')
+  ])
 
   registerIpc()
   await createWindow()
