@@ -92,7 +92,9 @@
       "createStartMenuShortcut": true,
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
-    }
+    },
+    "asar": false,
+    "afterPack": "scripts/build/verify-main-runtime-deps.cjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.76.1",
