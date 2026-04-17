@@ -131,7 +131,7 @@ const ReportSection = ({
   const theme = reportThemes[id === 'all' ? 'custom' : id];
   return (
     <div
-      className="stack-gap card-panel"
+      className="stack-gap card-panel report-section"
       data-report-mode={id}
       style={{ borderLeft: `6px solid ${theme.accent}`, background: theme.bg }}
     >
@@ -301,7 +301,7 @@ export const ReportsPage = () => {
 
   const exportPdf = async (mode: ReportMode, title: string) => {
     setExportMode(mode);
-    await new Promise((resolve) => window.setTimeout(resolve, 70));
+    await new Promise((resolve) => window.setTimeout(resolve, 180));
     try {
       const fileBase = sanitizeWindowsFileName(title) || 'reporte';
       const result = await api.printToPdfAuto({
@@ -442,8 +442,16 @@ export const ReportsPage = () => {
               background: #fff !important;
             }
 
-            html.reports-export-print body {
+            html.reports-export-print,
+            html.reports-export-print body,
+            html.reports-export-print #root {
               width: auto !important;
+              height: auto !important;
+              min-height: 0 !important;
+              overflow: visible !important;
+            }
+
+            html.reports-export-print body {
               margin: 0 !important;
               padding: 0 !important;
               background: #fff !important;
@@ -453,8 +461,24 @@ export const ReportsPage = () => {
               font-weight: 400 !important;
             }
 
+            html.reports-export-print .app-shell {
+              display: block !important;
+              width: auto !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
+
+            html.reports-export-print .sidebar,
+            html.reports-export-print .topbar {
+              display: none !important;
+            }
+
             html.reports-export-print .page-content {
               padding: 0 !important;
+              margin: 0 !important;
+              width: auto !important;
+              max-width: none !important;
+              height: auto !important;
               overflow: visible !important;
             }
 
@@ -466,8 +490,19 @@ export const ReportsPage = () => {
             html.reports-export-print .card-panel {
               border-radius: 12px !important;
               box-shadow: none !important;
-              break-inside: avoid;
-              page-break-inside: avoid;
+              overflow: visible !important;
+            }
+
+            html.reports-export-print .report-section {
+              break-inside: auto !important;
+              page-break-inside: auto !important;
+            }
+
+            html.reports-export-print .report-section > .summary-grid,
+            html.reports-export-print .report-section > .split-grid,
+            html.reports-export-print .report-section > .card-panel {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
             }
           }
         `}
