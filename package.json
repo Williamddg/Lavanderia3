@@ -36,6 +36,7 @@
     "files": [
       "dist/**",
       "dist-electron/**",
+      "node_modules/**",
       "package.json"
     ],
     "extraResources": [
@@ -81,8 +82,6 @@
     },
     "beforeBuild": "scripts/security/dist/electron-before-build.cjs",
     "asarUnpack": [
-      "node_modules/mysql2/**",
-      "node_modules/@mysql/**",
       "**/*.node",
       "dist-electron/bin/**"
     ],
@@ -93,7 +92,9 @@
       "createStartMenuShortcut": true,
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
-    }
+    },
+    "asar": false,
+    "afterPack": "scripts/build/verify-main-runtime-deps.cjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.76.1",
