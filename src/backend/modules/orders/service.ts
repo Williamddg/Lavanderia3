@@ -12,6 +12,10 @@ import { createOrderRepository } from './repositories/order-repository.js';
 import { createPaymentsService } from '../payments/service.js';
 import { createInvoicesService } from '../invoices/service.js';
 import { createDeliveriesService } from '../deliveries/service.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 const TERMINAL_STATES = new Set(['CANCELLED', 'CANCELED', 'CANCELADO']);
 
@@ -77,6 +81,8 @@ const mapOrder = (row: any): Order => ({
 });
 
 export const createOrdersService = (db: Kysely<Database>) => {
+  const actorId = () => getCurrentSessionUserId() ?? 1;
+  const actorName = () => getCurrentSessionUserName();
   const repository = createOrderRepository(db);
   const paymentsService = createPaymentsService(db);
   const invoicesService = createInvoicesService(db);
@@ -280,10 +286,11 @@ export const createOrdersService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId(),
           action: 'ORDER_CREATE',
           entity_type: 'order',
           entity_id: String(orderId),
-          details_json: JSON.stringify({ orderNumber, total })
+          details_json: JSON.stringify({ orderNumber, total, actorName: actorName() })
         })
         .execute();
     });
@@ -398,15 +405,18 @@ export const createOrdersService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId(),
           action: 'ORDER_UPDATE',
           entity_type: 'order',
           entity_id: String(orderId),
           details_json: JSON.stringify({
+            orderNumber: existingOrder.order_number,
             clientId: parsed.clientId,
             subtotal,
             discountTotal: parsed.discountTotal,
             total,
-            balanceDue
+            balanceDue,
+            actorName: actorName()
           })
         })
         .execute();
@@ -530,7 +540,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
               movement_type: 'PAYMENT_OUT',
               amount: Number(payment.amount),
               notes: `Devolución orden #${orderId} · ${payment.payment_method_name}`,
-              created_by: 1
+              created_by: actorId()
             })
             .execute();
         }
@@ -539,15 +549,18 @@ export const createOrdersService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId(),
           action: 'ORDER_CANCEL',
           entity_type: 'order',
           entity_id: String(orderId),
           details_json: JSON.stringify({
             orderId,
+            orderNumber: order.order_number,
             statusId: cancelStatus.id,
             statusName: cancelStatus.name,
             refundedTotal: totalPaid,
-            cashSessionId: activeCashSession?.id ?? null
+            cashSessionId: activeCashSession?.id ?? null,
+            actorName: actorName()
           })
         })
         .execute();
@@ -573,7 +586,12 @@ export const createOrdersService = (db: Kysely<Database>) => {
     const order = await db
       .selectFrom('orders')
       .innerJoin('order_statuses as os', 'os.id', 'orders.status_id')
-      .select(['orders.id', 'os.code as current_code', 'os.name as current_name'])
+      .select([
+        'orders.id',
+        'orders.order_number',
+        'os.code as current_code',
+        'os.name as current_name'
+      ])
       .where('orders.id', '=', orderId)
       .executeTakeFirst();
 
@@ -624,14 +642,17 @@ export const createOrdersService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId(),
           action: 'ORDER_STATUS_UPDATE',
           entity_type: 'order',
           entity_id: String(orderId),
           details_json: JSON.stringify({
             orderId,
+            orderNumber: order.order_number,
             statusId,
             statusCode: status.code,
-            statusName: status.name
+            statusName: status.name,
+            actorName: actorName()
           })
         })
         .execute();

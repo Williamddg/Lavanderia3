@@ -228,6 +228,9 @@ export type AuditEntry = {
   entityType: string;
   entityId: string;
   details: Record<string, any> | null;
+  userId: number | null;
+  actorName: string | null;
+  actorUsername: string | null;
   createdAt: string;
 };
 

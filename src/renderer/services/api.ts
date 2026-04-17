@@ -121,8 +121,14 @@ export const api = {
   quitApp: () => unwrap<{ quit: boolean }>(window.desktopApi.quitApp()),
   openExternal: (url: string) => unwrap(window.desktopApi.openExternal({ url })),
   printToPdf: (defaultFileName?: string) =>
-    unwrap<{ saved: boolean; path: string | null }>(window.desktopApi.printToPdf({ defaultFileName })),
-  printToPdfAuto: (input: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }) =>
+    unwrap<{ saved: boolean; path: string | null }>(window.desktopApi.printToPdf({ defaultFileName, pageSize: 'A4', landscape: false })),
+  printToPdfAuto: (input: {
+    defaultFileName?: string;
+    targetDir?: string | null;
+    subfolder?: string | null;
+    pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid';
+    landscape?: boolean;
+  }) =>
     unwrap<{ saved: boolean; path: string | null }>(callDesktopApi('printToPdfAuto', input)),
   selectDirectory: () =>
     unwrap<{ selected: boolean; path: string | null }>(callDesktopApi('selectDirectory')),

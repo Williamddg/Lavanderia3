@@ -4,12 +4,19 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@renderer/services/api';
 import { Button, DataTable, Input, PageHeader, SummaryCard } from '@renderer/ui/components';
 import { currency } from '@renderer/utils/format';
+import { showToast } from '@renderer/utils/toast';
 import type { ReportsSummary } from '@shared/types';
 
+const localDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 const today = new Date();
-const todayKey = today.toISOString().slice(0, 10);
-const monthStartKey = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-const yearStartKey = new Date(today.getFullYear(), 0, 1).toISOString().slice(0, 10);
+const todayKey = localDateKey(today);
+const monthStartKey = localDateKey(new Date(today.getFullYear(), today.getMonth(), 1));
+const yearStartKey = localDateKey(new Date(today.getFullYear(), 0, 1));
 
 const reportModes = ['day', 'month', 'year', 'custom', 'all'] as const;
 type ReportMode = (typeof reportModes)[number];
@@ -288,11 +295,23 @@ export const ReportsPage = () => {
     await new Promise((resolve) => window.setTimeout(resolve, 70));
     try {
       const fileBase = title.replace(/\s+/g, '-').toLowerCase();
-      await api.printToPdfAuto({
+      const result = await api.printToPdfAuto({
         defaultFileName: `${fileBase}-${todayKey}.pdf`,
         targetDir: pdfOutputDir ?? null,
-        subfolder: `Reportes/${todayKey}`
+        subfolder: `Reportes/${todayKey}`,
+        pageSize: 'A4',
+        landscape: true
       });
+      if (result.saved) {
+        showToast(`PDF exportado${result.path ? `: ${result.path}` : ''}`, 'success');
+      } else {
+        showToast('Exportación cancelada.', 'info');
+      }
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No fue posible exportar el PDF.',
+        'error'
+      );
     } finally {
       setExportMode(null);
     }
@@ -321,26 +340,28 @@ export const ReportsPage = () => {
 
   return (
     <section className="stack-gap">
-      <PageHeader
-        title="Reportes"
-        subtitle="Vista financiera y operativa (diaria, mes, anual y personalizada) con gráficos."
-        actions={
-          <div className="row-actions no-print">
-            <Button type="button" variant="secondary" onClick={() => exportPdf('all', 'Reporte completo')}>
-              Exportar Todo PDF
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => printThermal('Reporte completo', customQuery.data)}
-            >
-              Imprimir Todo
-            </Button>
-          </div>
-        }
-      />
+      <div className="reports-page-header">
+        <PageHeader
+          title="Reportes"
+          subtitle="Vista financiera y operativa (diaria, mes, anual y personalizada) con gráficos."
+          actions={
+            <div className="row-actions no-print">
+              <Button type="button" variant="secondary" onClick={() => exportPdf('all', 'Reporte completo')}>
+                Exportar Todo PDF
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => printThermal('Reporte completo', customQuery.data)}
+              >
+                Imprimir Todo
+              </Button>
+            </div>
+          }
+        />
+      </div>
 
-      <div className="card-panel stack-gap">
+      <div className="card-panel stack-gap reports-filter-card">
         <h3 style={{ margin: 0 }}>Rango personalizado</h3>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
           <label style={{ minWidth: 180 }}>
@@ -358,6 +379,26 @@ export const ReportsPage = () => {
             Aplicar filtro
           </Button>
         </div>
+      </div>
+
+      <div
+        className="reports-export-header"
+        style={{
+          display: exportMode ? 'block' : 'none',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 10,
+          padding: 14
+        }}
+      >
+        <h2 style={{ margin: 0 }}>
+          {exportMode === 'all'
+            ? 'Reporte consolidado'
+            : allSections.find((s) => s.id === exportMode)?.title ?? 'Reporte'}
+        </h2>
+        <p style={{ margin: '8px 0 0', color: '#4b5563' }}>
+          Generado: {new Date().toLocaleString('es-CO')}
+        </p>
       </div>
 
       {allSections.map((section) => (
@@ -379,6 +420,11 @@ export const ReportsPage = () => {
       <style>
         {`
           @media print {
+            @page {
+              size: A4 landscape;
+              margin: 1.5cm;
+            }
+
             html.reports-export-print {
               background: #fff !important;
             }
@@ -397,6 +443,11 @@ export const ReportsPage = () => {
             html.reports-export-print .page-content {
               padding: 0 !important;
               overflow: visible !important;
+            }
+
+            html.reports-export-print .reports-page-header,
+            html.reports-export-print .reports-filter-card {
+              display: none !important;
             }
 
             html.reports-export-print .card-panel {

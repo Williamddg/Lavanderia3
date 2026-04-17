@@ -7,6 +7,10 @@ import type {
   SellerUserCreateInput,
   SellerUserUpdateInput
 } from '../../../shared/types.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 const updateSchema = z.object({
   fullName: z.string().trim().min(3),
@@ -42,6 +46,8 @@ export const createUsersService = (db: Kysely<Database>) => ({
   },
 
   async updateSeller(id: number, input: SellerUserUpdateInput): Promise<SellerUser> {
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
     const parsed = updateSchema.parse(input);
 
     const target = await db
@@ -88,10 +94,12 @@ export const createUsersService = (db: Kysely<Database>) => ({
     await db
       .insertInto('audit_logs')
       .values({
+        user_id: actorId,
         action: 'USER_UPDATE',
         entity_type: 'user',
         entity_id: String(id),
         details_json: JSON.stringify({
+          actorName,
           updatedByModule: 'users',
           fullName: parsed.fullName,
           username: parsed.username,
@@ -110,6 +118,8 @@ export const createUsersService = (db: Kysely<Database>) => ({
   },
 
   async createSeller(input: SellerUserCreateInput): Promise<SellerUser> {
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
     const parsed = createSchema.parse(input);
 
     const existingUsername = await db
@@ -146,10 +156,12 @@ export const createUsersService = (db: Kysely<Database>) => ({
     await db
       .insertInto('audit_logs')
       .values({
+        user_id: actorId,
         action: 'USER_CREATE',
         entity_type: 'user',
         entity_id: String(inserted.insertId),
         details_json: JSON.stringify({
+          actorName,
           fullName: parsed.fullName,
           username: parsed.username,
           roleId
@@ -167,6 +179,8 @@ export const createUsersService = (db: Kysely<Database>) => ({
   },
 
   async removeSeller(id: number): Promise<{ success: true }> {
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
     const target = await db
       .selectFrom('users')
       .select(['id', 'role_id'])
@@ -190,10 +204,11 @@ export const createUsersService = (db: Kysely<Database>) => ({
     await db
       .insertInto('audit_logs')
       .values({
+        user_id: actorId,
         action: 'USER_DELETE',
         entity_type: 'user',
         entity_id: String(id),
-        details_json: JSON.stringify({ softDelete: true })
+        details_json: JSON.stringify({ softDelete: true, actorName })
       })
       .execute();
 

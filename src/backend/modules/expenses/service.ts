@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import type { Expense, ExpenseInput } from '../../../shared/types.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 const expenseSchema = z.object({
   categoryId: z.number().positive(),
@@ -72,6 +76,8 @@ export const createExpensesService = (db: Kysely<Database>) => {
 
   const create = async (input: ExpenseInput): Promise<Expense> => {
     const parsed = expenseSchema.parse(input);
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
 
     const activeCashSession = await db
       .selectFrom('cash_sessions')
@@ -156,7 +162,7 @@ export const createExpensesService = (db: Kysely<Database>) => {
           amount: parsed.amount,
           description: parsed.description,
           expense_date: new Date(parsed.expenseDate),
-          created_by: 1
+          created_by: actorId
         })
         .executeTakeFirstOrThrow();
 
@@ -167,23 +173,26 @@ export const createExpensesService = (db: Kysely<Database>) => {
           movement_type: 'EXPENSE_OUT',
           amount: parsed.amount,
           notes: `Gasto (${paymentMethod.name}): ${parsed.description}`,
-          created_by: 1
+          created_by: actorId
         })
         .execute();
 
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId,
           action: 'EXPENSE_CREATE',
           entity_type: 'expense',
           entity_id: String(result.insertId),
           details_json: JSON.stringify({
             categoryId: parsed.categoryId,
             paymentMethodId: parsed.paymentMethodId,
+            paymentMethodName: paymentMethod.name,
             amount: parsed.amount,
             description: parsed.description,
             expenseDate: parsed.expenseDate,
-            cashSessionId: activeCashSession?.id ?? null
+            cashSessionId: activeCashSession?.id ?? null,
+            actorName
           })
         })
         .execute();

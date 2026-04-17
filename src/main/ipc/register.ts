@@ -20,6 +20,7 @@ import { printerService } from '../services/printer-service.js';
 import { backupService } from '../services/backup-service.js';
 import { licenseService } from '../services/license-service.js';
 import { initialSetupService } from '../services/initial-setup-service.js';
+import { setCurrentSessionUser } from '../services/session-context.js';
 
 import type {
   BatchPaymentInput,
@@ -235,7 +236,16 @@ export const registerIpc = () => {
     })
   );
 
-  ipcMain.handle('app:print-to-pdf', async (event, input?: { defaultFileName?: string }) => {
+  ipcMain.handle(
+    'app:print-to-pdf',
+    async (
+      event,
+      input?: {
+        defaultFileName?: string;
+        pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid';
+        landscape?: boolean;
+      }
+    ) => {
     try {
       const webContents = event.sender;
       const defaultFileName = String(input?.defaultFileName ?? 'documento.pdf').trim() || 'documento.pdf';
@@ -251,12 +261,11 @@ export const registerIpc = () => {
       }
 
       await ensurePrintableFrameReady(webContents);
-      // pageSize in microns (80mm × 500mm max). preferCSSPageSize overrides on
-      // most platforms; explicit size acts as a safe fallback for Mac Electron.
       const pdf = await webContents.printToPDF({
         printBackground: true,
-        preferCSSPageSize: true,
-        pageSize: { width: 80_000, height: 500_000 }
+        preferCSSPageSize: false,
+        pageSize: input?.pageSize ?? 'A4',
+        landscape: Boolean(input?.landscape)
       });
 
       await writeFile(filePath, pdf);
@@ -268,13 +277,20 @@ export const registerIpc = () => {
         error: error instanceof Error ? error.message : 'No fue posible generar el PDF.'
       };
     }
-  });
+  }
+);
 
   ipcMain.handle(
     'app:print-to-pdf-auto',
     async (
       event,
-      input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }
+      input?: {
+        defaultFileName?: string;
+        targetDir?: string | null;
+        subfolder?: string | null;
+        pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid';
+        landscape?: boolean;
+      }
     ) => {
       try {
         const webContents = event.sender;
@@ -290,8 +306,9 @@ export const registerIpc = () => {
         await ensurePrintableFrameReady(webContents);
         const pdf = await webContents.printToPDF({
           printBackground: true,
-          preferCSSPageSize: true,
-          pageSize: { width: 80_000, height: 500_000 }
+          preferCSSPageSize: false,
+          pageSize: input?.pageSize ?? 'A4',
+          landscape: Boolean(input?.landscape)
         });
 
         await writeFile(outputPath, pdf);
@@ -363,9 +380,11 @@ export const registerIpc = () => {
 
   ipcMain.handle(
     'auth:login',
-    wrap(async (input: LoginInput) =>
-      createAuthService(await databaseManager.getDb()).login(input)
-    )
+    wrap(async (input: LoginInput) => {
+      const session = await createAuthService(await databaseManager.getDb()).login(input);
+      setCurrentSessionUser(session);
+      return session;
+    })
   );
 
   ipcMain.handle(

@@ -85,8 +85,8 @@ declare global {
       restartApp: () => Promise<unknown>;
       quitApp: () => Promise<unknown>;
       openExternal: (payload: ExternalLinkPayload) => Promise<unknown>;
-      printToPdf: (input?: { defaultFileName?: string }) => Promise<unknown>;
-      printToPdfAuto: (input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }) => Promise<unknown>;
+      printToPdf: (input?: { defaultFileName?: string; pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid'; landscape?: boolean }) => Promise<unknown>;
+      printToPdfAuto: (input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null; pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid'; landscape?: boolean }) => Promise<unknown>;
       selectDirectory: () => Promise<unknown>;
       setupCreateDatabase: (input: SetupRootConnectionInput) => Promise<unknown>;
       setupInitializeSchema: (input: SetupRootConnectionInput) => Promise<unknown>;

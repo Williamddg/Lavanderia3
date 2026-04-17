@@ -118,8 +118,24 @@ const EntryDetail = ({ entry }: { entry: AuditEntry }) => {
   const d = entry.details ?? {};
   const parts: string[] = [];
 
+  const actor =
+    entry.actorName?.trim() ||
+    entry.actorUsername?.trim() ||
+    d.actorName ||
+    d.username ||
+    null;
+  if (actor) parts.push(`Usuario: ${actor}`);
+
   if (d.orderNumber) parts.push(`Orden: ${d.orderNumber}`);
+  if (!d.orderNumber && d.orderId) parts.push(`Orden ID: ${d.orderId}`);
+  if (d.invoiceNumber) parts.push(`Factura: ${d.invoiceNumber}`);
+  if (d.cashSessionId) parts.push(`Caja: #${d.cashSessionId}`);
   if (d.clientName) parts.push(`Cliente: ${d.clientName}`);
+  if (d.deliveredTo) parts.push(`Entregado a: ${d.deliveredTo}`);
+  if (d.openingAmount !== undefined) parts.push(`Apertura: $${Number(d.openingAmount).toLocaleString('es-CO')}`);
+  if (d.declaredAmount !== undefined) parts.push(`Cierre declarado: $${Number(d.declaredAmount).toLocaleString('es-CO')}`);
+  if (d.systemAmount !== undefined) parts.push(`Cierre sistema: $${Number(d.systemAmount).toLocaleString('es-CO')}`);
+  if (d.differenceAmount !== undefined) parts.push(`Diferencia: $${Number(d.differenceAmount).toLocaleString('es-CO')}`);
   if (d.amount !== undefined) parts.push(`Monto: $${Number(d.amount).toLocaleString('es-CO')}`);
   if (d.total !== undefined && d.amount === undefined) parts.push(`Total: $${Number(d.total).toLocaleString('es-CO')}`);
   if (d.statusName) parts.push(`Estado: ${d.statusName}`);

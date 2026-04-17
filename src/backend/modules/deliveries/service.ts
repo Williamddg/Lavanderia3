@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import type { DeliveryInput, DeliveryRecord } from '../../../shared/types.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 const schema = z.object({
   orderId: z.number().positive(),
@@ -39,6 +43,8 @@ export const createDeliveriesService = (db: Kysely<Database>) => ({
 
   async create(input: DeliveryInput): Promise<DeliveryRecord> {
     const parsed = schema.parse(input);
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
 
     const order = await db
       .selectFrom('orders as o')
@@ -107,11 +113,13 @@ export const createDeliveriesService = (db: Kysely<Database>) => ({
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId,
           action: 'DELIVERY_CREATE',
           entity_type: 'delivery',
           entity_id: String(result.insertId),
           details_json: JSON.stringify({
             ...parsed,
+            actorName,
             receiverDocument: parsed.receiverDocument?.trim() || null,
             receiverPhone: parsed.receiverPhone?.trim() || null,
             relationshipToClient: parsed.relationshipToClient?.trim() || null,

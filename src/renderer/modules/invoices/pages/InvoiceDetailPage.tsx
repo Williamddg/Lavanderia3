@@ -5,6 +5,7 @@ import { api } from '@renderer/services/api';
 import { Button, PageHeader } from '@renderer/ui/components';
 import { currency, dateTime } from '@renderer/utils/format';
 import { Barcode } from '@renderer/ui/components/Barcode';
+import { showToast } from '@renderer/utils/toast';
 
 const renderValue = (value?: string | null) => {
   const text = String(value ?? '').trim();
@@ -70,13 +71,15 @@ export const InvoiceDetailPage = () => {
       const result = await api.printToPdfAuto({
         defaultFileName: `Factura-${data.invoiceNumber}.pdf`,
         targetDir: pdfOutputDir ?? null,
-        subfolder: `Facturas/${dayFolder}`
+        subfolder: `Facturas/${dayFolder}`,
+        pageSize: 'A4',
+        landscape: false
       });
       if (result.saved) {
-        alert(`PDF guardado correctamente${result.path ? ` en:\n${result.path}` : ''}`);
+        showToast(`PDF guardado${result.path ? `: ${result.path}` : ''}`, 'success');
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'No fue posible generar el PDF.');
+      showToast(error instanceof Error ? error.message : 'No fue posible generar el PDF.', 'error');
     } finally {
       setDownloadingPdf(false);
     }
@@ -84,7 +87,7 @@ export const InvoiceDetailPage = () => {
 
   const handleWhatsapp = async () => {
     if (!normalizedPhone) {
-      alert('El cliente no tiene teléfono válido para WhatsApp.');
+      showToast('El cliente no tiene teléfono válido para WhatsApp.', 'error');
       return;
     }
 
@@ -101,7 +104,9 @@ export const InvoiceDetailPage = () => {
       .printToPdfAuto({
         defaultFileName: `Factura-${data.invoiceNumber}.pdf`,
         targetDir: pdfOutputDir ?? null,
-        subfolder: `Facturas/${dayFolder}`
+        subfolder: `Facturas/${dayFolder}`,
+        pageSize: 'A4',
+        landscape: false
       })
       .catch((error) => {
         console.error('No fue posible autoguardar la factura en PDF:', error);

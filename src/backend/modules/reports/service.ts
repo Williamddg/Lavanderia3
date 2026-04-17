@@ -3,8 +3,13 @@ import type { Database } from '../../db/schema.js';
 import type { ReportsSummary } from '../../../shared/types.js';
 
 const startOfDay = (value: string) => new Date(`${value}T00:00:00`);
-const endOfDay = (value: string) => new Date(`${value}T23:59:59`);
-const formatDateKey = (date: Date) => date.toISOString().slice(0, 10);
+const endOfDay = (value: string) => new Date(`${value}T23:59:59.999`);
+const formatDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 const addDays = (date: Date, days: number) =>
   new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 

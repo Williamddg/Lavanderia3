@@ -1,6 +1,10 @@
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import type { Invoice, InvoiceDetail } from '../../../shared/types.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 const buildTicketCode = (orderNumber: string) => `TK-${orderNumber}`;
 
@@ -422,6 +426,8 @@ export const createInvoicesService = (db: Kysely<Database>) => {
   };
 
   const createFromOrder = async (orderId: number): Promise<InvoiceDetail> => {
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
     const order = await db
       .selectFrom('orders')
       .selectAll()
@@ -481,12 +487,15 @@ export const createInvoicesService = (db: Kysely<Database>) => {
         await trx
           .insertInto('audit_logs')
           .values({
+            user_id: actorId,
             action: 'INVOICE_REFRESH',
             entity_type: 'invoice',
             entity_id: String(invoiceId),
             details_json: JSON.stringify({
               orderId,
-              invoiceNumber: existingInvoice.invoice_number
+              orderNumber: order.order_number,
+              invoiceNumber: existingInvoice.invoice_number,
+              actorName
             })
           })
           .execute();
@@ -536,10 +545,16 @@ export const createInvoicesService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId,
           action: 'INVOICE_CREATE',
           entity_type: 'invoice',
           entity_id: String(invoiceId),
-          details_json: JSON.stringify({ orderId, invoiceNumber })
+          details_json: JSON.stringify({
+            orderId,
+            orderNumber: order.order_number,
+            invoiceNumber,
+            actorName
+          })
         })
         .execute();
     });

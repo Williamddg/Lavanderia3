@@ -58,8 +58,8 @@ contextBridge.exposeInMainWorld('desktopApi', {
   restartApp: () => ipcRenderer.invoke('app:restart'),
   quitApp: () => ipcRenderer.invoke('app:quit'),
   openExternal: (payload: ExternalLinkPayload) => ipcRenderer.invoke('app:open-external', payload),
-  printToPdf: (input?: { defaultFileName?: string }) => ipcRenderer.invoke('app:print-to-pdf', input),
-  printToPdfAuto: (input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null }) =>
+  printToPdf: (input?: { defaultFileName?: string; pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid'; landscape?: boolean }) => ipcRenderer.invoke('app:print-to-pdf', input),
+  printToPdfAuto: (input?: { defaultFileName?: string; targetDir?: string | null; subfolder?: string | null; pageSize?: 'A4' | 'Letter' | 'Legal' | 'Tabloid'; landscape?: boolean }) =>
     ipcRenderer.invoke('app:print-to-pdf-auto', input),
   selectDirectory: () => ipcRenderer.invoke('app:select-directory'),
   setupCreateDatabase: (input: SetupRootConnectionInput) =>

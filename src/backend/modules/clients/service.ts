@@ -3,6 +3,10 @@ import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import type { Client, ClientInput } from '../../../shared/types.js';
 import { createClientRepository } from './repositories/client-repository.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 const schema = z.object({
   firstName: z.string().trim().min(2),
@@ -87,6 +91,8 @@ export const createClientsService = (db: Kysely<Database>) => {
     },
 
     async create(input: ClientInput): Promise<Client> {
+      const actorId = getCurrentSessionUserId() ?? 1;
+      const actorName = getCurrentSessionUserName();
       const parsed = schema.parse(input);
 
       const existing = await db
@@ -111,12 +117,20 @@ export const createClientsService = (db: Kysely<Database>) => {
         notes: parsed.notes
       }).executeTakeFirstOrThrow();
       const row = await repository.findById(Number(result.insertId));
-      await db.insertInto('audit_logs').values({ action: 'CLIENT_CREATE', entity_type: 'client', entity_id: String(result.insertId), details_json: JSON.stringify(parsed) }).execute();
+      await db.insertInto('audit_logs').values({
+        user_id: actorId,
+        action: 'CLIENT_CREATE',
+        entity_type: 'client',
+        entity_id: String(result.insertId),
+        details_json: JSON.stringify({ ...parsed, actorName })
+      }).execute();
       if (!row) throw new Error('No fue posible recuperar el cliente creado.');
       return mapClient(row);
     },
 
     async update(id: number, input: ClientInput): Promise<Client> {
+      const actorId = getCurrentSessionUserId() ?? 1;
+      const actorName = getCurrentSessionUserName();
       const parsed = schema.parse(input);
 
       const existing = await db
@@ -139,12 +153,20 @@ export const createClientsService = (db: Kysely<Database>) => {
         notes: parsed.notes
       });
       const row = await repository.findById(id);
-      await db.insertInto('audit_logs').values({ action: 'CLIENT_UPDATE', entity_type: 'client', entity_id: String(id), details_json: JSON.stringify(parsed) }).execute();
+      await db.insertInto('audit_logs').values({
+        user_id: actorId,
+        action: 'CLIENT_UPDATE',
+        entity_type: 'client',
+        entity_id: String(id),
+        details_json: JSON.stringify({ ...parsed, actorName })
+      }).execute();
       if (!row) throw new Error('Cliente no encontrado.');
       return mapClient(row);
     },
 
     async remove(id: number) {
+      const actorId = getCurrentSessionUserId() ?? 1;
+      const actorName = getCurrentSessionUserName();
       const ordersCount = await db
         .selectFrom('orders')
         .select((eb) => eb.fn.count<number>('id').as('count'))
@@ -159,7 +181,13 @@ export const createClientsService = (db: Kysely<Database>) => {
       }
 
       await repository.delete(id);
-      await db.insertInto('audit_logs').values({ action: 'CLIENT_DELETE', entity_type: 'client', entity_id: String(id) }).execute();
+      await db.insertInto('audit_logs').values({
+        user_id: actorId,
+        action: 'CLIENT_DELETE',
+        entity_type: 'client',
+        entity_id: String(id),
+        details_json: JSON.stringify({ actorName })
+      }).execute();
       return { id };
     }
   };

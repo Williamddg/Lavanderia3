@@ -46,11 +46,22 @@ export const createAuditService = (db: Kysely<Database>) => {
     const bounds = buildDayBounds(dateKey);
 
     const rows = await db
-      .selectFrom('audit_logs')
-      .selectAll()
-      .where('created_at', '>=', bounds.from)
-      .where('created_at', '<=', bounds.to)
-      .orderBy('id', 'desc')
+      .selectFrom('audit_logs as a')
+      .leftJoin('users as u', 'u.id', 'a.user_id')
+      .select([
+        'a.id',
+        'a.action',
+        'a.entity_type',
+        'a.entity_id',
+        'a.details_json',
+        'a.created_at',
+        'a.user_id',
+        sql<string | null>`u.full_name`.as('actor_name'),
+        sql<string | null>`u.username`.as('actor_username')
+      ])
+      .where('a.created_at', '>=', bounds.from)
+      .where('a.created_at', '<=', bounds.to)
+      .orderBy('a.id', 'desc')
       .limit(500)
       .execute();
 
@@ -62,6 +73,9 @@ export const createAuditService = (db: Kysely<Database>) => {
       details: row.details_json ? (() => {
         try { return JSON.parse(String(row.details_json)); } catch { return null; }
       })() : null,
+      userId: row.user_id ?? null,
+      actorName: row.actor_name ?? null,
+      actorUsername: row.actor_username ?? null,
       createdAt: new Date(row.created_at).toISOString()
     }));
   };

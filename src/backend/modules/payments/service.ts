@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import type { BatchPaymentInput, Payment, PaymentInput } from '../../../shared/types.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 const schema = z.object({
   orderId: z.number().positive(),
@@ -50,6 +54,8 @@ export const createPaymentsService = (db: Kysely<Database>) => {
 
   const create = async (input: PaymentInput): Promise<Payment> => {
     const parsed = schema.parse(input);
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
 
     const activeCashSession = await db
       .selectFrom('cash_sessions')
@@ -128,12 +134,15 @@ export const createPaymentsService = (db: Kysely<Database>) => {
           await trx
             .insertInto('audit_logs')
             .values({
+              user_id: actorId,
               action: 'ORDER_AUTO_STATUS_UPDATE',
               entity_type: 'order',
               entity_id: String(parsed.orderId),
               details_json: JSON.stringify({
                 orderId: parsed.orderId,
-                newStatus: readyStatus.name
+                orderNumber: order.order_number,
+                newStatus: readyStatus.name,
+                actorName
               })
             })
             .execute();
@@ -150,12 +159,16 @@ export const createPaymentsService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId,
           action: 'PAYMENT_CASH_SESSION_CHECK',
           entity_type: 'payment',
           entity_id: String(inserted.insertId),
           details_json: JSON.stringify({
             activeCashSessionFound: Boolean(activeCashSession),
-            cashSessionId: activeCashSession?.id ?? null
+            cashSessionId: activeCashSession?.id ?? null,
+            orderId: parsed.orderId,
+            orderNumber: order.order_number,
+            actorName
           })
         })
         .execute();
@@ -174,20 +187,24 @@ export const createPaymentsService = (db: Kysely<Database>) => {
             movement_type: 'PAYMENT_IN',
             amount: parsed.amount,
             notes: `Pago orden #${parsed.orderId} · ${paymentMethod?.name ?? 'Método desconocido'}${parsed.reference ? ` · Ref: ${parsed.reference}` : ''}`,
-            created_by: 1
+            created_by: actorId
           })
           .executeTakeFirstOrThrow();
 
         await trx
           .insertInto('audit_logs')
           .values({
+            user_id: actorId,
             action: 'CASH_MOVEMENT_CREATE',
             entity_type: 'cash_session',
             entity_id: String(activeCashSession.id),
             details_json: JSON.stringify({
               orderId: parsed.orderId,
+              orderNumber: order.order_number,
               amount: parsed.amount,
-              paymentMethodId: parsed.paymentMethodId
+              paymentMethodId: parsed.paymentMethodId,
+              paymentMethodName: paymentMethod?.name ?? null,
+              actorName
             })
           })
           .execute();
@@ -196,10 +213,15 @@ export const createPaymentsService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId,
           action: 'PAYMENT_CREATE',
           entity_type: 'payment',
           entity_id: String(inserted.insertId),
-          details_json: JSON.stringify(parsed)
+          details_json: JSON.stringify({
+            ...parsed,
+            orderNumber: order.order_number,
+            actorName
+          })
         })
         .execute();
 
@@ -212,6 +234,8 @@ export const createPaymentsService = (db: Kysely<Database>) => {
   };
 
   const createBatch = async (input: BatchPaymentInput): Promise<Payment[]> => {
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
     if (!input.lines || input.lines.length === 0) {
       throw new Error('Debes ingresar al menos una línea de pago.');
     }
@@ -287,7 +311,7 @@ export const createPaymentsService = (db: Kysely<Database>) => {
             movement_type: 'PAYMENT_IN',
             amount: lineAmount,
             notes: `Pago orden #${input.orderId} · ${paymentMethod?.name ?? 'Método desconocido'}${line.reference ? ` · Ref: ${line.reference}` : ''}`,
-            created_by: 1
+            created_by: actorId
           })
           .execute();
       }
@@ -326,10 +350,17 @@ export const createPaymentsService = (db: Kysely<Database>) => {
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId,
           action: 'PAYMENT_BATCH_CREATE',
           entity_type: 'order',
           entity_id: String(input.orderId),
-          details_json: JSON.stringify({ orderId: input.orderId, totalAmount: amountToApply, lines: input.lines })
+          details_json: JSON.stringify({
+            orderId: input.orderId,
+            orderNumber: order.order_number,
+            totalAmount: amountToApply,
+            lines: input.lines,
+            actorName
+          })
         })
         .execute();
     });

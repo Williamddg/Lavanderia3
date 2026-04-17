@@ -6,9 +6,15 @@ import type {
   CashOpenInput,
   CashSessionSummary
 } from '../../../shared/types.js';
+import {
+  getCurrentSessionUserId,
+  getCurrentSessionUserName
+} from '../../../main/services/session-context.js';
 
 export const createCashService = (db: Kysely<Database>) => ({
   async open(input: CashOpenInput) {
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
     const active = await db
       .selectFrom('cash_sessions')
       .selectAll()
@@ -44,7 +50,7 @@ export const createCashService = (db: Kysely<Database>) => ({
     const result = await db
       .insertInto('cash_sessions')
       .values({
-        opened_by: 1,
+        opened_by: actorId,
         opened_by_name: openedByName,
         opened_by_phone: openedByPhone,
         opening_amount: resolvedOpeningAmount,
@@ -55,13 +61,15 @@ export const createCashService = (db: Kysely<Database>) => ({
     await db
       .insertInto('audit_logs')
       .values({
+        user_id: actorId,
         action: 'CASH_OPEN',
         entity_type: 'cash_session',
         entity_id: String(result.insertId),
         details_json: JSON.stringify({
           openingAmount: resolvedOpeningAmount,
           openedByName,
-          openedByPhone
+          openedByPhone,
+          actorName
         })
       })
       .execute();
@@ -74,6 +82,8 @@ export const createCashService = (db: Kysely<Database>) => ({
   },
 
   async close(input: CashCloseInput): Promise<CashCloseResult> {
+    const actorId = getCurrentSessionUserId() ?? 1;
+    const actorName = getCurrentSessionUserName();
     const active = await db
       .selectFrom('cash_sessions')
       .selectAll()
@@ -212,7 +222,7 @@ export const createCashService = (db: Kysely<Database>) => ({
         .insertInto('cash_closures')
         .values({
           cash_session_id: active.id,
-          closed_by: 1,
+          closed_by: actorId,
           declared_amount: declaredAmount,
           system_amount: systemAmount,
           difference_amount: differenceAmount
@@ -252,6 +262,7 @@ export const createCashService = (db: Kysely<Database>) => ({
       await trx
         .insertInto('audit_logs')
         .values({
+          user_id: actorId,
           action: 'CASH_CLOSE',
           entity_type: 'cash_session',
           entity_id: String(active.id),
@@ -263,7 +274,8 @@ export const createCashService = (db: Kysely<Database>) => ({
             differenceAmount,
             movementNet,
             openedByName: active.opened_by_name ?? null,
-            openedByPhone: active.opened_by_phone ?? null
+            openedByPhone: active.opened_by_phone ?? null,
+            actorName
           })
         })
         .execute();

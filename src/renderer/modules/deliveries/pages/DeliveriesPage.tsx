@@ -5,6 +5,7 @@ import { api } from '@renderer/services/api';
 import type { DeliveryInput } from '@shared/types';
 import { Button, DataTable, Input, Modal, PageHeader } from '@renderer/ui/components';
 import { currency, dateTime } from '@renderer/utils/format';
+import { showToast } from '@renderer/utils/toast';
 
 const emptyForm: DeliveryInput = {
   orderId: 0,
@@ -213,11 +214,21 @@ export const DeliveriesPage = () => {
     setExportMode(mode);
     await new Promise((resolve) => window.setTimeout(resolve, 60));
     try {
-      await api.printToPdfAuto({
+      const result = await api.printToPdfAuto({
         defaultFileName: fileName,
         targetDir: pdfOutputDir ?? null,
-        subfolder: `Entregas/${todayKey}`
+        subfolder: `Entregas/${todayKey}`,
+        pageSize: 'A4',
+        landscape: false
       });
+      if (result.saved) {
+        showToast(`PDF exportado${result.path ? `: ${result.path}` : ''}`, 'success');
+      }
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'No fue posible exportar el PDF.',
+        'error'
+      );
     } finally {
       setExportMode(null);
     }

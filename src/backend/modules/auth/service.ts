@@ -3,6 +3,7 @@ import { sql, type Kysely } from 'kysely';
 import bcrypt from 'bcryptjs';
 import type { Database } from '../../db/schema.js';
 import type { LoginInput, SessionUser } from '../../../shared/types.js';
+import { getCurrentSessionUserId } from '../../../main/services/session-context.js';
 
 const schema = z.object({
   username: z.string().min(3),
@@ -100,7 +101,7 @@ export const createAuthService = (db: Kysely<Database>) => ({
     await db
       .insertInto('audit_logs')
       .values({
-        user_id: null,
+        user_id: getCurrentSessionUserId(),
         action: 'ORDER_PROTECTION_PASSWORD_SUCCESS',
         entity_type: 'app_settings',
         entity_id: String(setting.id),
