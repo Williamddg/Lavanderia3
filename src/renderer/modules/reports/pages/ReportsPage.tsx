@@ -252,6 +252,7 @@ export const ReportsPage = () => {
   const [appliedFrom, setAppliedFrom] = useState(todayKey);
   const [appliedTo, setAppliedTo] = useState(todayKey);
   const [exportMode, setExportMode] = useState<ReportMode | null>(null);
+  const [customApplied, setCustomApplied] = useState(false);
   const { data: pdfOutputDir } = useQuery({
     queryKey: ['pdf-output-dir'],
     queryFn: api.getPdfOutputDir
@@ -280,10 +281,10 @@ export const ReportsPage = () => {
 
   const allSections = useMemo(
     () => [
+      { id: 'custom' as const, title: `Reporte personalizado (${appliedFrom} 00:00 a ${appliedTo} 23:59)`, data: customQuery.data },
       { id: 'day' as const, title: `Reporte diario (${todayKey} 00:00 a ${todayKey} 23:59)`, data: dayQuery.data },
       { id: 'month' as const, title: `Reporte mensual (${monthStartKey} 00:00 a ${todayKey} 23:59)`, data: monthQuery.data },
       { id: 'year' as const, title: `Reporte anual (${yearStartKey} 00:00 a ${todayKey} 23:59)`, data: yearQuery.data },
-      { id: 'custom' as const, title: `Reporte personalizado (${appliedFrom} 00:00 a ${appliedTo} 23:59)`, data: customQuery.data }
     ],
     [dayQuery.data, monthQuery.data, yearQuery.data, customQuery.data, appliedFrom, appliedTo]
   );
@@ -383,6 +384,7 @@ export const ReportsPage = () => {
           <Button onClick={() => {
             setAppliedFrom(from);
             setAppliedTo(to);
+            setCustomApplied(true);
           }}>
             Aplicar filtro
           </Button>
@@ -415,7 +417,10 @@ export const ReportsPage = () => {
           id={section.id}
           title={section.title}
           data={section.data}
-          hidden={Boolean(exportMode && exportMode !== 'all' && exportMode !== section.id)}
+          hidden={
+            (section.id === 'custom' && !customApplied) ||
+            Boolean(exportMode && exportMode !== 'all' && exportMode !== section.id)
+          }
           onExportPdf={exportPdf}
           onPrintThermal={printThermal}
         />
