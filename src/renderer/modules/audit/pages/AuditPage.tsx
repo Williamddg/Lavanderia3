@@ -55,7 +55,21 @@ const ACTION_LABELS: Record<string, { label: string; icon: string; color: string
 };
 
 const getActionMeta = (action: string) =>
-  ACTION_LABELS[action] ?? { label: action.replace(/_/g, ' ').toLowerCase(), icon: '📝', color: '#6b7280' };
+  ACTION_LABELS[action] ?? {
+    label: action
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase()),
+    icon: '📝',
+    color: '#6b7280'
+  };
+
+const localDateKey = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 
 const formatTime = (isoString: string) => {
   try {
@@ -84,12 +98,12 @@ const formatDayLabel = (dateStr: string) => {
 };
 
 const isToday = (dateStr: string) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateKey();
   return dateStr === today;
 };
 
 const isYesterday = (dateStr: string) => {
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const yesterday = localDateKey(new Date(Date.now() - 86400000));
   return dateStr === yesterday;
 };
 
@@ -111,7 +125,7 @@ const EntryDetail = ({ entry }: { entry: AuditEntry }) => {
   if (d.statusName) parts.push(`Estado: ${d.statusName}`);
   if (d.newStatus) parts.push(`Nuevo estado: ${d.newStatus}`);
   if (d.statusCode) parts.push(`Código: ${d.statusCode}`);
-  if (d.paymentMethodId) parts.push(`Método ID: ${d.paymentMethodId}`);
+  if (d.paymentMethodName) parts.push(`Método: ${d.paymentMethodName}`);
   if (d.refundedTotal !== undefined) parts.push(`Devuelto: $${Number(d.refundedTotal).toLocaleString('es-CO')}`);
   if (d.lines && Array.isArray(d.lines)) {
     const lineStr = d.lines.map((l: any) => `$${Number(l.amount).toLocaleString('es-CO')}`).join(' + ');
@@ -133,16 +147,17 @@ const EntryDetail = ({ entry }: { entry: AuditEntry }) => {
 
 // ─── Vista de eventos de un día ──────────────────────────────────────────────
 const DayView = ({ date, onBack }: { date: string; onBack: () => void }) => {
+  const dayKey = String(date).slice(0, 10);
   const { data: entries = [], isLoading } = useQuery({
-    queryKey: ['audit-day', date],
-    queryFn: () => api.auditListByDay(date),
+    queryKey: ['audit-day', dayKey],
+    queryFn: () => api.auditListByDay(dayKey),
     staleTime: 30_000
   });
 
   return (
     <section className="stack-gap">
       <PageHeader
-        title={dayLabel(date)}
+        title={dayLabel(dayKey)}
         subtitle={`${entries.length} evento${entries.length !== 1 ? 's' : ''} registrado${entries.length !== 1 ? 's' : ''}`}
         actions={
           <Button variant="secondary" onClick={onBack}>
@@ -230,7 +245,7 @@ export const AuditPage = () => {
     <section className="stack-gap">
       <PageHeader
         title="Auditoría"
-        subtitle="Historial de acciones importantes del sistema."
+        subtitle="Historial de acciones críticas del sistema, agrupadas por día."
       />
 
       {isLoading && <div className="card-panel">Cargando historial...</div>}

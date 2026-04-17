@@ -3,15 +3,35 @@ import type { Database } from '../../db/schema.js';
 import type { AuditDay, AuditEntry } from '../../../shared/types.js';
 
 export const createAuditService = (db: Kysely<Database>) => {
+  const normalizeDateKey = (value: string) => {
+    const raw = String(value ?? '').trim();
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error('Fecha inválida para auditoría.');
+    }
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const buildDayBounds = (dateKey: string) => {
+    const from = new Date(`${dateKey}T00:00:00`);
+    const to = new Date(`${dateKey}T23:59:59.999`);
+    return { from, to };
+  };
+
   const listDays = async (): Promise<AuditDay[]> => {
     const rows = await db
       .selectFrom('audit_logs')
       .select([
-        sql<string>`DATE(created_at)`.as('date'),
+        sql<string>`DATE_FORMAT(created_at, '%Y-%m-%d')`.as('date'),
         sql<number>`COUNT(*)`.as('count')
       ])
-      .groupBy(sql`DATE(created_at)`)
-      .orderBy(sql`DATE(created_at)`, 'desc')
+      .groupBy(sql`DATE_FORMAT(created_at, '%Y-%m-%d')`)
+      .orderBy(sql`DATE_FORMAT(created_at, '%Y-%m-%d')`, 'desc')
       .limit(90)
       .execute();
 
@@ -22,10 +42,14 @@ export const createAuditService = (db: Kysely<Database>) => {
   };
 
   const listByDay = async (date: string): Promise<AuditEntry[]> => {
+    const dateKey = normalizeDateKey(date);
+    const bounds = buildDayBounds(dateKey);
+
     const rows = await db
       .selectFrom('audit_logs')
       .selectAll()
-      .where(sql`DATE(created_at)`, '=', date)
+      .where('created_at', '>=', bounds.from)
+      .where('created_at', '<=', bounds.to)
       .orderBy('id', 'desc')
       .limit(500)
       .execute();
