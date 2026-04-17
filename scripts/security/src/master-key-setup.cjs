@@ -31,6 +31,7 @@ const run = async () => {
 
   writeEncryptedJson(securityFiles.encryptedEnvPath, payload, buildUnlockPassword());
   console.log(`[MASTER-KEY] Archivo cifrado creado en ${securityFiles.encryptedEnvPath}`);
+  process.exit(0);
 };
 
 run().catch((error) => {

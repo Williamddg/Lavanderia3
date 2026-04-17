@@ -106,6 +106,7 @@ const run = async () => {
   });
 
   console.log('[MASTER-KEY] Validación exitosa.');
+  process.exit(0);
 };
 
 run().catch((error) => {
