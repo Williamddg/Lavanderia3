@@ -487,10 +487,20 @@ export const ReportsPage = () => {
               display: none !important;
             }
 
+            html.reports-export-print .stack-gap {
+              gap: 10px !important;
+            }
+
+            html.reports-export-print .report-section {
+              gap: 10px !important;
+              padding: 12px !important;
+            }
+
             html.reports-export-print .card-panel {
               border-radius: 12px !important;
               box-shadow: none !important;
               overflow: visible !important;
+              padding: 12px !important;
             }
 
             html.reports-export-print .report-section {
@@ -498,11 +508,46 @@ export const ReportsPage = () => {
               page-break-inside: auto !important;
             }
 
+            html.reports-export-print .summary-grid {
+              display: grid !important;
+              grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+              gap: 10px !important;
+            }
+
+            html.reports-export-print .split-grid {
+              display: grid !important;
+              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+              gap: 10px !important;
+              align-items: start !important;
+            }
+
             html.reports-export-print .report-section > .summary-grid,
             html.reports-export-print .report-section > .split-grid,
             html.reports-export-print .report-section > .card-panel {
               break-inside: avoid !important;
               page-break-inside: avoid !important;
+            }
+
+            html.reports-export-print h2,
+            html.reports-export-print h3 {
+              word-break: normal !important;
+              overflow-wrap: break-word !important;
+              white-space: normal !important;
+              line-height: 1.15 !important;
+              margin-bottom: 6px !important;
+            }
+
+            html.reports-export-print span,
+            html.reports-export-print strong,
+            html.reports-export-print p {
+              word-break: normal !important;
+              overflow-wrap: break-word !important;
+              white-space: normal !important;
+            }
+
+            html.reports-export-print [data-report-mode] [style*='grid-template-columns: 160px 1fr 90px'] {
+              grid-template-columns: 130px 1fr 78px !important;
+              gap: 6px !important;
             }
           }
         `}
