@@ -339,6 +339,17 @@ export const DeliveriesPage = () => {
     return relatedOrder?.orderNumber ?? `#${orderId}`;
   };
 
+  const deliveredPrintableRows = useMemo(
+    () =>
+      deliveredTodayRows.map((row) => ({
+        orderNumber: getOrderDisplay(row.orderId),
+        clientName: row.deliveredTo,
+        dueDate: null,
+        statusName: 'Entregada'
+      })),
+    [deliveredTodayRows, orders]
+  );
+
   return (
     <section className="stack-gap">
       <PageHeader
@@ -459,6 +470,13 @@ export const DeliveriesPage = () => {
               onClick={() => exportSectionToPdf('delivered-today', `Entregas-ordenes-entregadas-hoy-${todayKey}.pdf`)}
             >
               Exportar PDF
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => printThermalList('Órdenes entregadas hoy', deliveredPrintableRows)}
+            >
+              Imprimir
             </Button>
           </div>
         </div>

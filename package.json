@@ -14,7 +14,8 @@
     "prebuild": "node scripts/security/dist/pipeline-entry.cjs --mode=build",
     "dist:local": "npm run build && electron-builder --win nsis --publish never",
     "dist:mac": "npm run build && electron-builder --mac --x64",
-    "dist:win": "npm run build && electron-builder --win nsis --publish always",
+    "dist:win": "npm run build && electron-builder --win nsis --publish never",
+    "dist:win:publish": "npm run build && electron-builder --win nsis --publish always",
     "dev:renderer": "vite",
     "dev:electron": "tsc -p tsconfig.electron.json --watch",
     "dev:app": "wait-on http-get://localhost:5173 dist-electron/main/main.js && npx electron .",
@@ -65,7 +66,8 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "resources/icon.ico"
     },
     "mac": {
       "target": [
@@ -82,7 +84,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico"
     }
   },
   "dependencies": {
