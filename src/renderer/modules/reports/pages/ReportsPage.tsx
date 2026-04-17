@@ -17,6 +17,14 @@ const today = new Date();
 const todayKey = localDateKey(today);
 const monthStartKey = localDateKey(new Date(today.getFullYear(), today.getMonth(), 1));
 const yearStartKey = localDateKey(new Date(today.getFullYear(), 0, 1));
+const sanitizeWindowsFileName = (value: string) =>
+  String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
 
 const reportModes = ['day', 'month', 'year', 'custom', 'all'] as const;
 type ReportMode = (typeof reportModes)[number];
@@ -294,7 +302,7 @@ export const ReportsPage = () => {
     setExportMode(mode);
     await new Promise((resolve) => window.setTimeout(resolve, 70));
     try {
-      const fileBase = title.replace(/\s+/g, '-').toLowerCase();
+      const fileBase = sanitizeWindowsFileName(title) || 'reporte';
       const result = await api.printToPdfAuto({
         defaultFileName: `${fileBase}-${todayKey}.pdf`,
         targetDir: pdfOutputDir ?? null,

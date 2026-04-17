@@ -263,7 +263,7 @@ export const InvoiceDetailPage = ({ user }: { user: SessionUser }) => {
         <div className="thermal-divider" />
 
         <div className="thermal-section">
-          <h3>Detalle</h3>
+          <h3>Notas por ítem</h3>
           {data.items.map((item, index) => (
             <div key={item.id} className="thermal-item">
               <div className="thermal-item-row thermal-item-title">
@@ -274,11 +274,6 @@ export const InvoiceDetailPage = ({ user }: { user: SessionUser }) => {
                 <span>Cant: {item.quantity}</span>
                 <span>Unit: {currency(item.unitPrice)}</span>
               </div>
-              {String(item.description ?? '').trim() ? (
-                <p className="thermal-item-note">
-                  <strong>Descripción:</strong> {item.description}
-                </p>
-              ) : null}
               {(Number(item.discountAmount ?? 0) > 0 || Number(item.surchargeAmount ?? 0) > 0) ? (
                 <div className="thermal-item-row">
                   <span>Desc: {currency(item.discountAmount)}</span>
@@ -289,7 +284,11 @@ export const InvoiceDetailPage = ({ user }: { user: SessionUser }) => {
                 <p className="thermal-item-note">
                   <strong>Obs:</strong> {item.customerObservations}
                 </p>
-              ) : null}
+              ) : (
+                <p className="thermal-item-note thermal-muted">
+                  Sin notas para este ítem.
+                </p>
+              )}
             </div>
           ))}
         </div>
