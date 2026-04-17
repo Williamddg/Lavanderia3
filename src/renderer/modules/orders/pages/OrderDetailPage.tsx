@@ -12,6 +12,7 @@ import {
   StatusChip
 } from '@renderer/ui/components';
 import { currency, dateTime } from '@renderer/utils/format';
+import { showToast } from '@renderer/utils/toast';
 import { PaymentForm } from '@renderer/modules/payments/components/PaymentForm';
 import { OrderForm } from '../components/OrderForm';
 
@@ -183,6 +184,8 @@ export const OrderDetailPage = () => {
       await queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      showToast('La orden fue actualizada correctamente.', 'success');
+      navigate('/ordenes');
     }
   });
 
@@ -225,14 +228,14 @@ export const OrderDetailPage = () => {
   },
 
   onSuccess: async () => {
-    console.log('✅ Notas guardadas');
-
     await queryClient.invalidateQueries({ queryKey: ['order-detail', orderId] });
     await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    showToast('La información de la orden fue actualizada correctamente.', 'success');
+    navigate('/ordenes');
   },
 
   onError: (error) => {
-    console.error('❌ Error guardando notas:', error);
+    showToast(error instanceof Error ? error.message : 'No fue posible actualizar la orden.', 'error');
   }
 });
 

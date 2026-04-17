@@ -129,8 +129,14 @@ const EntryDetail = ({ entry }: { entry: AuditEntry }) => {
   if (d.orderNumber) parts.push(`Orden: ${d.orderNumber}`);
   if (!d.orderNumber && d.orderId) parts.push(`Orden ID: ${d.orderId}`);
   if (d.invoiceNumber) parts.push(`Factura: ${d.invoiceNumber}`);
+  if (!d.invoiceNumber && entry.entityType === 'invoice' && entry.entityId && entry.entityId !== '0') parts.push(`Factura interna: #${entry.entityId}`);
+  if (entry.entityType === 'payment' && entry.entityId && entry.entityId !== '0') parts.push(`Pago: #${entry.entityId}`);
+  if (entry.entityType === 'delivery' && entry.entityId && entry.entityId !== '0') parts.push(`Entrega: #${entry.entityId}`);
+  if (entry.entityType === 'expense' && entry.entityId && entry.entityId !== '0') parts.push(`Gasto: #${entry.entityId}`);
+  if (entry.entityType === 'warranty' && entry.entityId && entry.entityId !== '0') parts.push(`Garantía: #${entry.entityId}`);
   if (d.cashSessionId) parts.push(`Caja: #${d.cashSessionId}`);
   if (d.clientName) parts.push(`Cliente: ${d.clientName}`);
+  if (!d.clientName && d.clientId) parts.push(`Cliente: #${d.clientId}`);
   if (d.deliveredTo) parts.push(`Entregado a: ${d.deliveredTo}`);
   if (d.openingAmount !== undefined) parts.push(`Apertura: $${Number(d.openingAmount).toLocaleString('es-CO')}`);
   if (d.declaredAmount !== undefined) parts.push(`Cierre declarado: $${Number(d.declaredAmount).toLocaleString('es-CO')}`);
@@ -142,12 +148,17 @@ const EntryDetail = ({ entry }: { entry: AuditEntry }) => {
   if (d.newStatus) parts.push(`Nuevo estado: ${d.newStatus}`);
   if (d.statusCode) parts.push(`Código: ${d.statusCode}`);
   if (d.paymentMethodName) parts.push(`Método: ${d.paymentMethodName}`);
+  if (d.reference) parts.push(`Referencia: ${d.reference}`);
   if (d.refundedTotal !== undefined) parts.push(`Devuelto: $${Number(d.refundedTotal).toLocaleString('es-CO')}`);
+  if (d.discountTotal !== undefined) parts.push(`Descuento: $${Number(d.discountTotal).toLocaleString('es-CO')}`);
+  if (d.balanceDue !== undefined) parts.push(`Saldo: $${Number(d.balanceDue).toLocaleString('es-CO')}`);
+  if (d.subtotal !== undefined) parts.push(`Subtotal: $${Number(d.subtotal).toLocaleString('es-CO')}`);
   if (d.lines && Array.isArray(d.lines)) {
     const lineStr = d.lines.map((l: any) => `$${Number(l.amount).toLocaleString('es-CO')}`).join(' + ');
     parts.push(`Líneas: ${lineStr}`);
   }
   if (d.totalAmount !== undefined) parts.push(`Total abonado: $${Number(d.totalAmount).toLocaleString('es-CO')}`);
+  if (d.softDelete) parts.push('Registro desactivado');
   if (d.description) parts.push(String(d.description));
   if (d.reason) parts.push(`Motivo: ${d.reason}`);
   if (d.resolution) parts.push(`Resolución: ${d.resolution}`);
