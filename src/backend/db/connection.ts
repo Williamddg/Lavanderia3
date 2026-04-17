@@ -1,7 +1,9 @@
 import { Kysely, MysqlDialect } from 'kysely';
-import mysql from 'mysql2';
+import { loadMysqlRuntime } from '../../shared/mysql-runtime-loader.js';
 import type { Database } from './schema.js';
 import type { DbConnectionConfig } from '../../shared/types.js';
+
+const mysql = loadMysqlRuntime();
 
 export const createDb = (config: DbConnectionConfig) => new Kysely<Database>({
   dialect: new MysqlDialect({
