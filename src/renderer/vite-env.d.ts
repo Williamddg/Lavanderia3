@@ -33,9 +33,6 @@ declare global {
       updateOrder: (orderId: number, input: OrderInput) => Promise<unknown>;
       cancelOrder: (orderId: number) => Promise<unknown>;
 
-      getLicenseStatus: () => Promise<unknown>;
-      activateLicense: (licenseKey: string) => Promise<unknown>;
-
       connectDriveBackup: () => Promise<unknown>;
       uploadBackupToDrive: () => Promise<unknown>;
       listBackups: () => Promise<unknown>;

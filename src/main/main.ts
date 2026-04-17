@@ -1,7 +1,8 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc/register'
 import { autoUpdater } from 'electron-updater'
+import { MASTER_BUILD_AUTHORIZED } from './generated/master-build-auth'
 
 const isDev = !app.isPackaged
 
@@ -46,6 +47,15 @@ const createWindow = async () => {
 }
 
 app.whenReady().then(async () => {
+  if (!MASTER_BUILD_AUTHORIZED) {
+    await dialog.showErrorBox(
+      'Ejecución bloqueada',
+      'Este binario no fue generado con validación de clave maestra.'
+    )
+    app.quit()
+    return
+  }
+
   registerIpc()
   await createWindow()
 

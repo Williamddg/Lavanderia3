@@ -32,9 +32,6 @@ contextBridge.exposeInMainWorld('desktopApi', {
 }) =>
   ipcRenderer.invoke('settings:update-order-protection-password', input),
 
-  getLicenseStatus: () => ipcRenderer.invoke('license:status'),
-  activateLicense: (licenseKey: string) => ipcRenderer.invoke('license:activate', licenseKey),
-
   connectDriveBackup: () => ipcRenderer.invoke('backup:connect-drive'),
   uploadBackupToDrive: () => ipcRenderer.invoke('backup:upload-drive'),
   listBackups: () => ipcRenderer.invoke('backup:list'),

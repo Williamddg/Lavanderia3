@@ -102,7 +102,7 @@ export const LoginPage = ({ onLogin }: Props) => {
 
             <div className="auth-feature-card">
               <strong>Más control</strong>
-              <span>Caja, gastos, licencias y operación en tiempo real.</span>
+              <span>Caja, gastos y operación en tiempo real.</span>
             </div>
 
             <div className="auth-feature-card">

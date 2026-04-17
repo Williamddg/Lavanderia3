@@ -64,10 +64,6 @@ const callDesktopApi = <T>(fnName: string, ...args: any[]): Promise<T> => {
 };
 
 export const api = {
-  licenseStatus: () => unwrap<any>(window.desktopApi.getLicenseStatus()),
-  activateLicense: (licenseKey: string) =>
-    unwrap<any>(window.desktopApi.activateLicense(licenseKey)),
-
   connectDriveBackup: () =>
     unwrap<ConnectDriveResult>(window.desktopApi.connectDriveBackup()),
 

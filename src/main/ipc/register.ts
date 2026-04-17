@@ -18,7 +18,6 @@ import { createUsersService } from '../../backend/modules/users/service.js';
 import { createAuditService } from '../../backend/modules/audit/service.js';
 import { printerService } from '../services/printer-service.js';
 import { backupService } from '../services/backup-service.js';
-import { licenseService } from '../services/license-service.js';
 import { initialSetupService } from '../services/initial-setup-service.js';
 import { setCurrentSessionUser } from '../services/session-context.js';
 
@@ -79,22 +78,6 @@ export const registerIpc = () => {
     // 350ms fixed wait — enough for React useEffect renders (barcode, images) on Mac
     await new Promise((resolve) => setTimeout(resolve, 350));
   };
-
-  ipcMain.handle(
-    'license:status',
-    wrap(async () => {
-      const version = app.getVersion();
-      return licenseService.status(version);
-    })
-  );
-
-  ipcMain.handle(
-    'license:activate',
-    wrap(async (licenseKey: string) => {
-      const version = app.getVersion();
-      return licenseService.activate(licenseKey, version);
-    })
-  );
 
   ipcMain.handle(
     'backup:connect-drive',

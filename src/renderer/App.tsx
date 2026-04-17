@@ -23,16 +23,8 @@ import { WhatsappPage } from './modules/whatsapp/pages/WhatsappPage';
 import { SettingsPage } from './modules/settings/pages/SettingsPage';
 import { UsersPage } from './modules/users/pages/UsersPage';
 import { AuditPage } from './modules/audit/pages/AuditPage';
-import { LicensePage } from './modules/license/pages/LicensePage';
-import { LicenseRenewalBanner } from './modules/license/components/LicenseRenewalBanner';
 
 export default function App() {
-  const [licenseReady, setLicenseReady] = useState(false);
-  const [licenseValid, setLicenseValid] = useState(false);
-  const [licenseWarning, setLicenseWarning] = useState(false);
-  const [licenseDaysLeft, setLicenseDaysLeft] = useState(0);
-  const [licenseBusinessName, setLicenseBusinessName] = useState<string | null>(null);
-
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,43 +37,10 @@ export default function App() {
 
   useEffect(() => {
     api.health().then(setHealth).finally(() => setLoading(false));
-
-    api.licenseStatus()
-      .then((result) => {
-        setLicenseValid(Boolean(result?.valid));
-
-        if (result?.valid && result?.warning) {
-          setLicenseWarning(true);
-          setLicenseDaysLeft(Number(result?.daysLeft ?? 0));
-          setLicenseBusinessName(result?.businessName ?? null);
-        } else {
-          setLicenseWarning(false);
-          setLicenseDaysLeft(0);
-          setLicenseBusinessName(null);
-        }
-      })
-      .catch(() => {
-        setLicenseValid(false);
-        setLicenseWarning(false);
-        setLicenseDaysLeft(0);
-        setLicenseBusinessName(null);
-      })
-      .finally(() => {
-        setLicenseReady(true);
-      });
   }, []);
 
   if (loading) {
     return <div className="center-page">Cargando aplicación...</div>;
-  }
-
-  if (!licenseReady) {
-    return <div className="center-page">Validando licencia...</div>;
-  }
-
-  // Si ya venció o no existe licencia válida, bloquea todo
-  if (!licenseValid) {
-    return <LicensePage onActivated={() => window.location.reload()} />;
   }
 
   if (!health?.configured || !health.connected) {
@@ -103,13 +62,6 @@ export default function App() {
 
   return (
     <>
-      {licenseWarning && licenseDaysLeft > 0 && (
-        <LicenseRenewalBanner
-          daysLeft={licenseDaysLeft}
-          businessName={licenseBusinessName}
-        />
-      )}
-
       <Routes>
         <Route element={<AppShell user={user} onLogout={() => setUser(null)} />}>
           <Route path="/" element={<DashboardPage />} />

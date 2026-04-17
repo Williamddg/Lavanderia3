@@ -10,6 +10,7 @@ electron-builder-cache/
 *.pkg
 .env
 .env.local
+.env.masterkey
 Credenciales.md
 
 ## Ignore Visual Studio temporary files, build results, and

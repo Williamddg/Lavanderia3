@@ -6,6 +6,11 @@
   "description": "Aplicación de escritorio para gestión de lavandería y sastrería",
   "main": "dist-electron/main/main.js",
   "scripts": {
+    "masterkey:setup": "node scripts/master-key-setup.cjs",
+    "masterkey:check": "node scripts/master-key-guard.cjs",
+    "predev": "node scripts/master-key-guard.cjs --mode=dev",
+    "prestart": "node scripts/master-key-guard.cjs --mode=start",
+    "prebuild": "node scripts/master-key-guard.cjs --mode=build",
     "dist:local": "npm run build && electron-builder --win nsis --publish never",
     "dist:mac": "npm run build && electron-builder --mac --x64",
     "dist:win": "npm run build && electron-builder --win nsis --publish always",
@@ -79,7 +84,6 @@
     }
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.101.1",
     "@tanstack/react-query": "^5.76.1",
     "bcryptjs": "^2.4.3",
     "dayjs": "^1.11.13",
