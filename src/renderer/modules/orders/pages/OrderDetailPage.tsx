@@ -579,7 +579,7 @@ export const OrderDetailPage = () => {
       style={{ background: '#7c3aed', color: '#fff', border: 'none' }}
       to={`/facturas/${data.id}`}
     >
-      Generar factura
+      Factura
     </Link>
 
     <Button

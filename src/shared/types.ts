@@ -339,11 +339,8 @@ export type InvoiceDetail = Invoice & {
   activeOrders: Array<{
     id: number;
     orderNumber: string;
-    statusName: string;
-    total: number;
-    paidTotal: number;
-    balanceDue: number;
     dueDate: string | null;
+    itemsCount: number;
   }>;
   generatedBy: string | null;
   softwareName: string;

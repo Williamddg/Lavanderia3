@@ -224,6 +224,7 @@ export const createOrdersService = (db: Kysely<Database>) => {
           order_number: orderNumber,
           client_id: parsed.clientId,
           status_id: receivedStatus.id,
+          created_by: actorId(),
           notes: parsed.notes,
           discount_reason: parsed.discountReason ?? null,
           subtotal,

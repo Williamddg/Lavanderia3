@@ -12,6 +12,13 @@ const renderValue = (value?: string | null) => {
   return text ? text : '—';
 };
 
+const renderDateOnly = (value?: string | null) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('es-CO');
+};
+
 const localDateKey = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -176,30 +183,32 @@ export const InvoiceDetailPage = () => {
 
   return (
     <section className="stack-gap invoice-page">
-      <PageHeader
-        title={`Factura ${data.invoiceNumber}`}
-        subtitle={`Orden ${data.orderNumber} · Cliente: ${data.clientName}`}
-        actions={
-          <div className="row-actions no-print">
-            <Button variant="secondary" onClick={() => navigate(`/ordenes/${orderId}`)}>
-              Volver
-            </Button>
-            <Button variant="secondary" onClick={handleWhatsapp}>
-              Enviar por WhatsApp
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleSavePdf}
-              disabled={runningPdfAction}
-            >
-              {runningPdfAction ? 'Generando PDF...' : 'Guardar PDF'}
-            </Button>
-            <Button onClick={handlePrint} disabled={runningPdfAction}>
-              {runningPdfAction ? 'Preparando impresión...' : 'Imprimir'}
-            </Button>
-          </div>
-        }
-      />
+      <div className="no-print">
+        <PageHeader
+          title={`Factura ${data.invoiceNumber}`}
+          subtitle={`Orden ${data.orderNumber} · Cliente: ${data.clientName}`}
+          actions={
+            <div className="row-actions no-print">
+              <Button variant="secondary" onClick={() => navigate(`/ordenes/${orderId}`)}>
+                Volver
+              </Button>
+              <Button variant="secondary" onClick={handleWhatsapp}>
+                Enviar por WhatsApp
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleSavePdf}
+                disabled={runningPdfAction}
+              >
+                {runningPdfAction ? 'Generando PDF...' : 'Guardar PDF'}
+              </Button>
+              <Button onClick={handlePrint} disabled={runningPdfAction}>
+                {runningPdfAction ? 'Preparando impresión...' : 'Imprimir'}
+              </Button>
+            </div>
+          }
+        />
+      </div>
 
       <div className="thermal-invoice">
         <div className="thermal-header">
@@ -222,12 +231,14 @@ export const InvoiceDetailPage = () => {
         <div className="thermal-divider" />
 
         <div className="thermal-section">
-          <h3>Orden</h3>
-          <p><strong>Nro. orden:</strong> {data.orderNumber}</p>
-          <p><strong>Consecutivo:</strong> {data.orderId}</p>
+          <div className="thermal-order-row">
+            <h3>Orden:</h3>
+            <div className="thermal-order-number">{data.orderNumber}</div>
+          </div>
           <p><strong>Fecha:</strong> {dateTime(data.createdAt)}</p>
-          <p><strong>Fecha promesa:</strong> {data.dueDate ? dateTime(data.dueDate) : '—'}</p>
-          <p><strong>Estado financiero:</strong> {Number(data.balanceDue) > 0 ? 'Con saldo' : 'Pagada'}</p>
+          <p><strong>Fecha promesa:</strong> {renderDateOnly(data.dueDate)}</p>
+          <p><strong>Estado:</strong> {Number(data.balanceDue) > 0 ? 'Con saldo' : 'Pagada'}</p>
+          <p><strong>Generado por:</strong> {renderValue(data.generatedBy || 'Usuario del sistema')}</p>
         </div>
 
         <div className="thermal-divider" />
@@ -236,7 +247,7 @@ export const InvoiceDetailPage = () => {
           <h3>Cliente</h3>
           <p><strong>Nombre:</strong> {data.clientName}</p>
           <p><strong>Teléfono:</strong> {renderValue(data.clientPhone)}</p>
-          {data.notes ? <p><strong>Notas:</strong> {data.notes}</p> : null}
+          {data.notes ? <p><strong>Notas generales:</strong> {data.notes}</p> : null}
         </div>
 
         <div className="thermal-divider" />
@@ -261,6 +272,11 @@ export const InvoiceDetailPage = () => {
                 <span>Cant: {item.quantity}</span>
                 <span>Unit: {currency(item.unitPrice)}</span>
               </div>
+              {String(item.description ?? '').trim() ? (
+                <p className="thermal-item-note">
+                  <strong>Descripción:</strong> {item.description}
+                </p>
+              ) : null}
               {(Number(item.discountAmount ?? 0) > 0 || Number(item.surchargeAmount ?? 0) > 0) ? (
                 <div className="thermal-item-row">
                   <span>Desc: {currency(item.discountAmount)}</span>
@@ -285,12 +301,34 @@ export const InvoiceDetailPage = () => {
           <div><span>Saldo</span><strong>{currency(data.balanceDue)}</strong></div>
         </div>
 
+        {data.activeOrders.length > 0 ? (
+          <>
+            <div className="thermal-divider" />
+
+            <div className="thermal-section">
+              <h3>Demás órdenes activas</h3>
+              {data.activeOrders.map((order) => (
+                <div key={order.id} className="thermal-item thermal-active-order">
+                  <div className="thermal-item-row thermal-item-title">
+                    <span>{order.orderNumber}</span>
+                    <strong>{order.itemsCount} ítems</strong>
+                  </div>
+                  <div className="thermal-item-row">
+                    <span>Fecha promesa</span>
+                    <span>{renderDateOnly(order.dueDate)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+
         <div className="thermal-divider" />
 
         <div className="thermal-section">
           <h3>Políticas</h3>
           <p>{data.companyPolicies || 'No hay políticas configuradas.'}</p>
-          <p className="thermal-muted">{data.legalText || 'Documento generado por el sistema.'}</p>
+          <p className="thermal-muted thermal-centered">Generada con LavaSuite, software desarrollado por SisteTecni.</p>
         </div>
       </div>
 
@@ -339,12 +377,48 @@ export const InvoiceDetailPage = () => {
             margin: 8px 0;
           }
 
+          .thermal-order-number-block {
+            text-align: center;
+            margin: 2px 0 6px;
+          }
+
+          .thermal-order-number-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            opacity: 0.8;
+          }
+
+          .thermal-order-number {
+            font-size: 22px;
+            line-height: 1.05;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+          }
+
+          .thermal-order-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+
+          .thermal-order-row h3 {
+            margin: 0;
+            font-size: 14px; /* opcional */
+          }
+
           .thermal-item {
             padding: 0 0 7px;
             margin-bottom: 7px;
             border-bottom: 1px dashed rgba(0, 0, 0, 0.2);
             break-inside: avoid;
             page-break-inside: avoid;
+          }
+
+          .thermal-active-order:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: 0;
           }
 
           .thermal-item-row,
@@ -384,7 +458,7 @@ export const InvoiceDetailPage = () => {
           }
 
           .thermal-barcode-text {
-            font-size: 14px;
+            font-size: 10px;
             font-weight: 700;
             letter-spacing: 1.4px;
             font-family: Consolas, 'Courier New', monospace;
@@ -394,6 +468,10 @@ export const InvoiceDetailPage = () => {
 
           .thermal-muted {
             opacity: 0.8;
+          }
+
+          .thermal-centered {
+            text-align: center;
           }
 
           @media print {

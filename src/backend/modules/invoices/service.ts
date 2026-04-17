@@ -23,8 +23,8 @@ const buildWhatsappMessage = (invoice: {
   items: Array<any>;
   activeOrders?: Array<{
     orderNumber: string;
-    statusName: string;
-    balanceDue: number;
+    dueDate: string | null;
+    itemsCount: number;
   }>;
 }) => {
   const formatMoney = (value: number) =>
@@ -70,7 +70,7 @@ const buildWhatsappMessage = (invoice: {
           '*ÓRDENES ACTIVAS DEL CLIENTE*',
           ...invoice.activeOrders.map(
             (order, index) =>
-              `${index + 1}. ${order.orderNumber} | ${order.statusName} | Saldo: ${formatMoney(order.balanceDue)}`
+              `${index + 1}. ${order.orderNumber} | Fecha promesa: ${order.dueDate ? new Date(order.dueDate).toLocaleDateString('es-CO') : 'Sin definir'} | Ítems: ${order.itemsCount}`
           )
         ].join('\n')
       : null,
@@ -177,30 +177,25 @@ export const createInvoicesService = (db: Kysely<Database>) => {
     const rows = await db
       .selectFrom('orders as o')
       .innerJoin('order_statuses as os', 'os.id', 'o.status_id')
+      .leftJoin('order_items as oi', 'oi.order_id', 'o.id')
       .select([
         'o.id',
         'o.order_number',
-        'o.total',
-        'o.paid_total',
-        'o.balance_due',
         'o.due_date',
-        sql<string>`os.code`.as('status_code'),
-        sql<string>`os.name`.as('status_name')
+        sql<number>`COALESCE(SUM(oi.quantity), 0)`.as('items_count')
       ])
       .where('o.client_id', '=', clientId)
       .where('o.id', '!=', excludeOrderId)
       .where('os.code', 'not in', ['DELIVERED', 'CANCELLED', 'CANCELED', 'CANCELADO'])
+      .groupBy(['o.id', 'o.order_number', 'o.due_date'])
       .orderBy('o.id desc')
       .execute();
 
     return rows.map((row) => ({
       id: row.id,
       orderNumber: row.order_number,
-      statusName: row.status_name,
-      total: Number(row.total ?? 0),
-      paidTotal: Number(row.paid_total ?? 0),
-      balanceDue: Number(row.balance_due ?? 0),
-      dueDate: row.due_date ? new Date(row.due_date).toISOString() : null
+      dueDate: row.due_date ? new Date(row.due_date).toISOString() : null,
+      itemsCount: Number(row.items_count ?? 0)
     }));
   };
 
@@ -340,7 +335,7 @@ export const createInvoicesService = (db: Kysely<Database>) => {
         total: Number(item.total ?? item.subtotal)
       })),
       activeOrders,
-      generatedBy: invoice.generated_by ?? null,
+      generatedBy: getCurrentSessionUserName() ?? invoice.generated_by ?? null,
       softwareName: 'LavaSuite Desktop',
       whatsappMessage: buildWhatsappMessage({
         invoiceNumber: mapped.invoiceNumber,
@@ -356,8 +351,8 @@ export const createInvoicesService = (db: Kysely<Database>) => {
         companyName: mapped.companyName,
         activeOrders: activeOrders.map((order) => ({
           orderNumber: order.orderNumber,
-          statusName: order.statusName,
-          balanceDue: order.balanceDue
+          dueDate: order.dueDate,
+          itemsCount: order.itemsCount
         })),
         items: items.map((item) => ({
           description: item.description,
