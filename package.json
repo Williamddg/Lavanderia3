@@ -80,6 +80,10 @@
       ]
     },
     "beforeBuild": "scripts/security/dist/electron-before-build.cjs",
+    "asarUnpack": [
+      "node_modules/mysql2/**",
+      "node_modules/@mysql/**"
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
