@@ -7,12 +7,40 @@ import {
   resolveDevPath
 } from '../utils/runtime-paths.js';
 
-const resolvePrinterModulePath = () => {
+const resolveModulePath = (moduleId: string) => {
   try {
-    return require.resolve('@alexssmusica/node-printer');
+    return require.resolve(moduleId);
   } catch {
     return null;
   }
+};
+
+const checkModule = (
+  key: string,
+  moduleId: string,
+  message: string,
+  required: boolean,
+  statusWhenMissing: RuntimeCheck['status']
+): RuntimeCheck => {
+  const resolvedPath = resolveModulePath(moduleId);
+
+  if (!resolvedPath) {
+    return {
+      key,
+      status: statusWhenMissing,
+      message,
+      resolvedPath: null,
+      required
+    };
+  }
+
+  return {
+    key,
+    status: 'ok',
+    message: `Módulo ${moduleId} detectado.`,
+    resolvedPath,
+    required
+  };
 };
 
 const checkMysqldump = (): RuntimeCheck => {
@@ -81,7 +109,7 @@ const checkGoogleOauth = (): RuntimeCheck => {
 };
 
 const checkPrinterModule = (): RuntimeCheck => {
-  const resolvedPath = resolvePrinterModulePath();
+  const resolvedPath = resolveModulePath('@alexssmusica/node-printer');
 
   if (process.platform !== 'win32') {
     return {
@@ -117,5 +145,58 @@ export const getRuntimeDiagnostics = (): RuntimeDiagnostics => ({
   isPackaged: app.isPackaged,
   appPath: app.getAppPath(),
   resourcesPath: process.resourcesPath,
-  checks: [checkMysqldump(), checkGoogleOauth(), checkPrinterModule()]
+  checks: [
+    checkMysqldump(),
+    checkGoogleOauth(),
+    checkModule(
+      'mysql2',
+      'mysql2',
+      'No se encontró mysql2. La app no podrá crear pools de conexión MySQL.',
+      true,
+      'error'
+    ),
+    checkModule(
+      'mysql2_promise',
+      'mysql2/promise',
+      'No se encontró mysql2/promise. Fallarán pruebas y configuración de conexión.',
+      true,
+      'error'
+    ),
+    checkModule(
+      'kysely',
+      'kysely',
+      'No se encontró kysely. El acceso a datos fallará.',
+      true,
+      'error'
+    ),
+    checkModule(
+      'electron_store',
+      'electron-store',
+      'No se encontró electron-store. La configuración local no estará disponible.',
+      true,
+      'error'
+    ),
+    checkModule(
+      'googleapis',
+      'googleapis',
+      'No se encontró googleapis. El backup en Drive quedará deshabilitado.',
+      false,
+      'warning'
+    ),
+    checkModule(
+      'node_machine_id',
+      'node-machine-id',
+      'No se encontró node-machine-id. Fallará la identificación de hardware.',
+      true,
+      'error'
+    ),
+    checkModule(
+      'supabase',
+      '@supabase/supabase-js',
+      'No se encontró @supabase/supabase-js. Las funciones de telemetría/sync opcionales no estarán disponibles.',
+      false,
+      'warning'
+    ),
+    checkPrinterModule()
+  ]
 });

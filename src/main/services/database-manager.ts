@@ -1,6 +1,6 @@
-import mysql from 'mysql2/promise';
 import type { Kysely } from 'kysely';
 import { createDb } from '../../backend/db/connection.js';
+import { loadMysql2Promise } from '../../backend/db/mysql-runtime.js';
 import { runMigrations } from '../../backend/db/migrator.js';
 import type { Database } from '../../backend/db/schema.js';
 import type { DbConnectionConfig, HealthStatus } from '../../shared/types.js';
@@ -18,6 +18,7 @@ class DatabaseManager {
   }
 
   async saveConfig(config: DbConnectionConfig) {
+    const mysql = loadMysql2Promise();
     const connection = await mysql.createConnection({
       host: config.host,
       port: config.port,
@@ -52,6 +53,7 @@ class DatabaseManager {
     }
 
     try {
+      const mysql = loadMysql2Promise();
       const connection = await mysql.createConnection({
         host: config.host,
         port: config.port,
