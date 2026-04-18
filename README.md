@@ -129,10 +129,15 @@ Datos típicos de configuración inicial:
 
 - `npm run dev`: desarrollo local.
 - `npm run build`: compila renderer y proceso principal. Requiere clave maestra.
+- `npm run runtime:check`: valida binarios/credenciales runtime para build autocontenida.
+- `npm run dist:win:selfcontained`: genera portable + nsis y valida `win-unpacked`.
+- `npm run dist:win:selfcontained:mvp`: genera build portable mínima autocontenida.
 - `npm run typecheck`: validación TypeScript.
 - `npm run lint`: lint del proyecto.
 - `npm run dist:win`: genera instalador Windows localmente, sin publicar release. Requiere clave maestra.
 - `npm run dist:win:publish`: genera y publica release de Windows. Requiere clave maestra y credenciales de publicación.
+
+Consulta `BUILD_WINDOWS_AUTOCONTENIDA.md` para el flujo operativo completo de empaquetado y validación en Windows limpio.
 
 ## Salida de compilación Windows
 
