@@ -89,6 +89,7 @@ declare global {
       deleteService: (id: number) => Promise<{ success: boolean }>;
 
       health: () => Promise<unknown>;
+      runtimeDiagnostics: () => Promise<unknown>;
       restartApp: () => Promise<unknown>;
       quitApp: () => Promise<unknown>;
       openExternal: (payload: ExternalLinkPayload) => Promise<unknown>;

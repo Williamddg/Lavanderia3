@@ -19,6 +19,7 @@ import { createAuditService } from '../../backend/modules/audit/service.js';
 import { printerService } from '../services/printer-service.js';
 import { backupService } from '../services/backup-service.js';
 import { initialSetupService } from '../services/initial-setup-service.js';
+import { getRuntimeDiagnostics } from '../services/runtime-diagnostics-service.js';
 import {
   clearCurrentSessionUser,
   getCurrentSessionUser,
@@ -68,6 +69,7 @@ export const registerIpc = () => {
 
   const publicChannels = new Set([
     'app:health',
+    'app:runtime-diagnostics',
     'setup:create-database',
     'setup:initialize-schema',
     'setup:finalize',
@@ -189,6 +191,11 @@ export const registerIpc = () => {
     // 350ms fixed wait — enough for React useEffect renders (barcode, images) on Mac
     await new Promise((resolve) => setTimeout(resolve, 350));
   };
+
+  ipcMain.handle(
+    'app:runtime-diagnostics',
+    wrap(async () => getRuntimeDiagnostics())
+  );
 
   ipcMain.handle(
     'backup:connect-drive',

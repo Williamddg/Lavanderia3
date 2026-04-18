@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
     ipcRenderer.invoke('warranties:update-status', id, input),
 
   health: () => ipcRenderer.invoke('app:health'),
+  runtimeDiagnostics: () => ipcRenderer.invoke('app:runtime-diagnostics'),
   restartApp: () => ipcRenderer.invoke('app:restart'),
   quitApp: () => ipcRenderer.invoke('app:quit'),
   openExternal: (payload: ExternalLinkPayload) => ipcRenderer.invoke('app:open-external', payload),
