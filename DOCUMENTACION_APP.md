@@ -1,109 +1,93 @@
-# Documentación Técnica de LavaSuite
+# Documentacion Tecnica de LavaSuite
 
 ## Resumen
 
-LavaSuite es una aplicación de escritorio para lavandería y sastrería. Corre sobre Electron y separa claramente:
+LavaSuite es una app de escritorio construida con Electron + React + TypeScript + Node.js.
+La UI corre en el renderer, la logica de sistema corre en el proceso principal de Electron y la persistencia principal del negocio vive en MySQL.
 
-- interfaz en `renderer`
-- integración con sistema operativo en `main`
-- lógica de negocio y acceso a datos en `backend`
-- contratos compartidos en `shared`
+Capas principales:
 
-La aplicación está orientada a operación local por instalación, con base de datos MySQL propia y generación de instaladores para Windows.
+- `src/renderer`: interfaz, navegacion, formularios y consumo de API expuesta por `preload`
+- `src/main`: ventana Electron, `preload`, registro IPC y servicios del sistema
+- `src/backend`: servicios de negocio, acceso a base de datos, migraciones y esquema
+- `src/shared`: tipos compartidos entre renderer y main
 
-## Arquitectura general
+## Stack real del proyecto
 
-```mermaid
-flowchart LR
-    A[Renderer React] --> B[window.desktopApi]
-    B --> C[preload.ts]
-    C --> D[IPC Electron]
-    D --> E[src/main/ipc/register.ts]
-    E --> F[src/main/services]
-    E --> G[src/backend/modules]
-    G --> H[Kysely]
-    H --> I[MySQL]
-```
+- Electron
+- React 18
+- TypeScript
+- Vite
+- React Router con `HashRouter`
+- TanStack Query
+- Kysely
+- MySQL (`mysql2`)
+- `electron-store`
+- `electron-builder`
+- `electron-updater`
+- Supabase Functions para licencias
+- Google Drive API para backups
 
-## Capas del proyecto
+## Flujo de arranque de la app
 
-### `src/renderer`
-
-Contiene la interfaz:
-
-- páginas
-- formularios
-- tablas
-- navegación
-- hooks
-- estilos
-
-Desde aquí nunca se habla directo con Node ni con MySQL. Todo pasa por `window.desktopApi`.
-
-### `src/main`
-
-Contiene la parte Electron:
-
-- creación de ventana
-- preload
-- registro de canales IPC
-- servicios dependientes del sistema operativo
-- selección de carpetas
-- impresión
-- exportación a PDF
-- apertura de enlaces externos
-
-### `src/backend`
-
-Contiene la lógica real del negocio:
-
-- autenticación
-- clientes
-- órdenes
-- pagos
-- facturas
-- entregas
-- caja
-- gastos
-- garantías
-- reportes
-- auditoría
-- configuración
-- usuarios
-
-### `src/shared`
-
-Contiene tipos TypeScript compartidos entre renderer y main/backend.
-
-## Flujo de arranque
+La secuencia real al abrir la app es esta:
 
 ```mermaid
 flowchart TD
-    A[Electron ready] --> B[registerIpc]
+    A[Electron app ready] --> B[registerIpc]
     B --> C[createWindow]
     C --> D[Renderer App.tsx]
     D --> E[api.health]
-    E --> F{DB configurada y conectada?}
-    F -- No --> G[SetupPage]
-    F -- Sí --> H{Usuario autenticado?}
-    H -- No --> I[LoginPage]
-    H -- Sí --> J[AppShell]
-    J --> K[Dashboard]
+    D --> F[api.licenseStatus]
+    E --> G{DB configurada y conectada?}
+    F --> H{Licencia valida?}
+    H -- No --> I[LicensePage]
+    H -- Si --> G
+    G -- No --> J[SetupPage]
+    G -- Si --> K{Usuario autenticado?}
+    K -- No --> L[LoginPage]
+    K -- Si --> M[AppShell]
+    M --> N[Dashboard]
 ```
 
-Orden práctico de pantallas:
+Orden exacto de pantallas:
 
-1. carga inicial
-2. validación de salud de la app
-3. configuración inicial MySQL si hace falta
-4. login
-5. dashboard
+1. `Cargando aplicación...`
+2. `Validando licencia...`
+3. Si no hay licencia valida: `LicensePage`
+4. Si la licencia esta bien pero no hay DB: `SetupPage`
+5. Si DB ok pero no hay sesion: `LoginPage`
+6. Si todo esta bien: `AppShell` + `DashboardPage`
 
-## Navegación principal
+## Que hace la pantalla inicial
 
-Rutas registradas:
+La primera pantalla funcional no siempre es el login.
+Depende del estado del sistema:
 
-- `/`
+- Si falta licencia: muestra activacion de licencia
+- Si la licencia es valida pero falta conexion MySQL: muestra configuracion inicial
+- Si la DB ya esta configurada: muestra login
+- Despues del login entra al dashboard
+
+## Siguiente vista y siguientes
+
+Despues del login la ruta inicial es `/`, que corresponde a `DashboardPage`.
+
+Desde el menu lateral el flujo normal de operacion es:
+
+1. `Dashboard`
+2. `Clientes`
+3. `Órdenes`
+4. `Órdenes > Nueva orden`
+5. `Órdenes > Detalle`
+6. Desde detalle se conectan `Pagos`, `Facturas`, `Entregas` y cambio de estado
+7. `Caja`, `Gastos`, `Garantías`, `Reportes`, `WhatsApp`, `Configuración`
+
+## Navegacion disponible
+
+Rutas actualmente registradas:
+
+- `/` Dashboard
 - `/clientes`
 - `/ordenes`
 - `/ordenes/nueva`
@@ -119,243 +103,362 @@ Rutas registradas:
 - `/reportes`
 - `/whatsapp`
 - `/configuracion`
-- `/usuarios`
 - `/auditoria`
 
-## Módulos funcionales
+## Arquitectura de datos
 
-### Clientes
+```mermaid
+flowchart LR
+    A[React Renderer] --> B[window.desktopApi]
+    B --> C[Electron preload]
+    C --> D[ipcRenderer/ipcMain]
+    D --> E[src/main/ipc/register.ts]
+    E --> F[Servicios main]
+    E --> G[Servicios backend]
+    G --> H[Kysely]
+    H --> I[MySQL]
+```
 
-- alta
-- edición
-- búsqueda
-- bloqueo de eliminación cuando hay órdenes asociadas
+## Flujo de datos por capa
 
-### Órdenes
+### 1. Renderer
 
-- creación con múltiples ítems
-- edición
-- cancelación
-- cambio de estado
-- notas
-- validaciones de negocio
+El renderer nunca habla directo con Node ni con MySQL.
+Consume funciones expuestas por `window.desktopApi`.
 
-### Pagos
+Ejemplos:
 
-- pago simple
-- pago por múltiples métodos
-- actualización de saldos
-- integración con caja
+- `api.listOrders()`
+- `api.openCashSession()`
+- `api.uploadBackupToDrive()`
+- `api.activateLicense()`
 
-### Facturación
+### 2. Preload
 
-- generación desde orden
-- reutilización/refresco de factura existente
-- vista térmica
-- código de barras
-- guardado PDF
+`src/main/preload.ts` publica la API segura al navegador embebido.
 
-### Entregas
+Esto desacopla la UI del acceso directo a Node y permite mantener `contextIsolation: true`.
 
-- órdenes prometidas para hoy
-- órdenes listas para entregar
-- órdenes entregadas hoy
-- órdenes activas en lavandería
-- impresión térmica
-- exportación PDF por sección
+### 3. IPC
 
-### Caja
+`src/main/ipc/register.ts` recibe los llamados del renderer, los envuelve en respuestas tipo:
 
-- apertura
-- cierre
-- movimientos derivados de pagos y devoluciones
+- `success: true, data`
+- `success: false, error`
 
-### Gastos
+### 4. Servicios
 
-- registro de egresos
-- integración con reportes
+Hay dos grupos:
 
-### Garantías
+- `src/main/services`: licencias, impresoras, backup, DB manager
+- `src/backend/modules/*`: logica de negocio por modulo
 
-- apertura
-- cambio de estado
-- seguimiento
+### 5. Base de datos
 
-### Reportes
+La app usa MySQL con Kysely.
+La conexion se guarda localmente con `electron-store`.
+Las migraciones SQL se ejecutan automaticamente desde `databaseManager.healthCheck()` y `databaseManager.migrate()`.
 
-- diario
-- mensual
-- anual
-- personalizado
-- impresión térmica
-- exportación PDF
+## Flujo de trabajo del usuario
 
-### Auditoría
+```mermaid
+flowchart TD
+    A[Activar licencia] --> B[Configurar MySQL]
+    B --> C[Iniciar sesion]
+    C --> D[Dashboard]
+    D --> E[Crear cliente]
+    E --> F[Crear orden]
+    F --> G[Registrar pagos]
+    G --> H[Generar factura]
+    H --> I[Entregar orden]
+    D --> J[Gestionar caja]
+    D --> K[Reportes]
+    D --> L[Backups]
+```
 
-- listado por día
-- detalle legible por evento
-- enfoque orientado a usuario final, no solo técnico
+## Licencias
 
-### Configuración
+Si, la app si esta manejando licencias.
 
-- datos del negocio
-- logo
-- políticas
-- ruta de salida PDF
-- contraseña administrativa protegida
+Implementacion actual:
 
-### Inventario
+- Servicio: `src/main/services/license-service.ts`
+- UI de activacion: `src/renderer/modules/license/pages/LicensePage.tsx`
+- Validacion al arranque: `src/renderer/App.tsx`
 
-Hoy funciona como catálogo de servicios. No es inventario físico completo.
+Como funciona:
 
-## Flujo operativo del usuario
+1. Se genera un `machineId` con hostname + plataforma + arquitectura
+2. Se llama una Supabase Function llamada `validate-license`
+3. Si responde valido, se cachea localmente en `electron-store`
+4. Si luego falla internet, hay una gracia offline de hasta 72 horas desde la ultima validacion
+5. Si no hay licencia valida, la app bloquea el acceso a todo lo demas
+
+Datos cacheados:
+
+- `licenseKey`
+- `expiresAt`
+- `daysLeft`
+- `lastValidatedAt`
+- `planType`
+- `businessName`
+- `phone`
+
+Observaciones:
+
+- La licencia si bloquea toda la app
+- Hay banner de renovacion cuando faltan pocos dias
+- La compra de licencia redirige a WhatsApp
+
+## Configuracion inicial
+
+`SetupPage` aparece cuando la app no tiene conexion MySQL guardada o no logra conectarse.
+
+Campos:
+
+- host
+- puerto
+- usuario
+- password
+- base de datos
+
+Al guardar:
+
+1. prueba conexion
+2. guarda config en `electron-store`
+3. ejecuta migraciones
+4. recarga la app
+
+## Login
+
+El login usa `api.login()` y devuelve un `SessionUser`.
+La sesion actual se mantiene en estado React en `App.tsx`.
+
+Importante:
+
+- No vi persistencia completa de sesion entre reinicios
+- `rememberMe` se envia al login, pero la persistencia depende del backend/servicio de auth
+
+## Modulos implementados
+
+Estos modulos tienen codigo funcional real en renderer y backend:
+
+- Licencias
+- Configuracion inicial MySQL
+- Login
+- Dashboard
+- Clientes
+- Órdenes
+- Detalle de orden
+- Pagos
+- Facturacion
+- Detalle de factura
+- Caja
+- Entregas
+- Gastos
+- Garantías
+- Reportes
+- WhatsApp
+- Configuracion
+- Catalogo de servicios bajo la pantalla `Inventario`
+
+## Modulos parciales o con alcance distinto al nombre
+
+- `Inventario`: hoy no maneja stock fisico. En realidad funciona como catalogo de servicios.
+- `WhatsApp`: abre `wa.me` con mensajes generados. No vi integracion directa con API oficial de WhatsApp.
+- `Caja`: funcional, pero la parte de hardware depende de Windows.
+- `Backups`: funcionales en UI y servicio, pero la generacion del dump hoy depende de `mysqldump.exe`.
+
+## Modulos faltantes totalmente por desarrollar
+
+Lo que vi totalmente faltante o placeholder real:
+
+- `Auditoría`
+
+Estado actual de `Auditoría`:
+
+- Existe la ruta
+- Muestra `PlaceholderPage`
+- No vi implementacion de vista final ni exploracion real de logs desde renderer
+
+## Flujo de ordenes
 
 ```mermaid
 flowchart TD
     A[Cliente] --> B[Nueva orden]
-    B --> C[Ítems]
+    B --> C[Items de la orden]
     C --> D[Pago inicial opcional]
-    D --> E[Orden en proceso]
+    D --> E[Orden creada]
     E --> F[Detalle de orden]
     F --> G[Registrar pagos]
-    F --> H[Generar factura]
-    F --> I[Marcar lista]
-    I --> J[Entrega]
-    D --> K[Caja]
-    F --> L[Auditoría]
-    J --> M[Reportes]
+    F --> H[Cambiar estado]
+    F --> I[Generar factura]
+    F --> J[Registrar entrega]
 ```
 
-## Persistencia y base de datos
+Capacidades vistas en detalle de orden:
 
-La app usa MySQL y Kysely.
+- editar orden
+- cancelar orden
+- cambiar estado
+- guardar notas
+- registrar pagos
+- abrir cajon automaticamente si el pago es efectivo y el hardware esta soportado
+- lanzar mensaje WhatsApp cuando la orden queda lista
 
-Puntos relevantes:
+## Caja y hardware
 
-- el esquema está definido en `src/backend/db/schema.ts`
-- las migraciones SQL viven en `src/backend/db/migrations`
-- la conexión local se administra desde servicios de `main`
-- el chequeo de salud y migración ocurre al arrancar
+Hardware actualmente contemplado:
 
-## Integración entre capas
+- impresora
+- cajon de dinero
 
-Ejemplos típicos:
+Estado por plataforma:
 
-- renderer llama `api.listOrders()`
-- `api` usa `window.desktopApi`
-- `preload` expone la función
-- `ipcMain` recibe y delega
-- un servicio backend consulta o escribe en MySQL
-- el resultado vuelve como `success/data` o `success/error`
+- Windows: soportado
+- macOS: bloqueado con mensaje de advertencia
 
-## Archivos privados y restricciones del repositorio
+Mensaje usado:
 
-Este repositorio no incluye todos los elementos necesarios para compilar, distribuir o usar ciertas integraciones sensibles.
+> Esta funcionalidad requiere hardware (impresora, lector QR, cajón de dinero) que solo está disponible en Windows. En macOS no podrás usar estas funciones. El resto de la aplicación funciona con normalidad.
 
-No se suben al repositorio:
+Notas:
 
-- `.env`
-- `.env.masterkey.enc`
-- `google-oauth.json`
+- El hardware no se carga en macOS al iniciar
+- La UI sigue accesible
+- El cajon se abre por impresora RAW usando `@alexssmusica/node-printer`
 
-Esos archivos son privados y los conserva únicamente el equipo desarrollador autorizado.
+## Backups
 
-## Clave maestra de compilación
+Implementacion:
 
-La app usa una validación de clave maestra en scripts sensibles del pipeline.
+- Servicio principal: `src/main/services/backup-service.ts`
+- Pantalla de uso: `src/renderer/modules/settings/pages/SettingsPage.tsx`
+- Persistencia de historial: tabla `backups`
+- Tokens Google Drive: tabla `google_drive_tokens`
 
-Eso aplica especialmente a:
+Flujo:
 
-- `npm run build`
-- `npm run dist`
-- `npm run dist:win`
-- scripts de seguridad relacionados
+```mermaid
+flowchart TD
+    A[Usuario pulsa Conectar Google Drive] --> B[OAuth local en puerto 3017]
+    B --> C[Se guardan tokens en MySQL]
+    C --> D[Usuario pulsa Crear backup y subir]
+    D --> E[Generar dump SQL]
+    E --> F[Registrar backup como UPLOADING]
+    F --> G[Subir archivo a Google Drive]
+    G --> H[Actualizar tabla backups con estado final]
+```
 
-Consecuencia práctica:
+Detalles importantes:
 
-- clonar el repo no es suficiente para empaquetar la app
-- aunque el código esté presente, el build protegido falla sin la clave
-- la clave maestra no está almacenada en el repositorio
-- solo los desarrolladores autorizados pueden ejecutar build/distribución completos
+- Usa `google-oauth.json`
+- Abre navegador externo para OAuth
+- Guarda tokens en MySQL
+- Genera archivo `.sql` temporal
+- Sube a Google Drive con `drive.file`
 
-## Build y distribución
+Compatibilidad actual:
 
-Scripts principales:
+- En Windows puede usar `resources/bin/mysqldump.exe`
+- En macOS puede usar `mysqldump` del sistema si esta disponible en `PATH`
+- Si no existe ninguna de esas opciones, el backup falla con mensaje explicito
+
+## Actualizaciones automaticas
+
+La app usa `electron-updater`.
+
+Comportamiento actual:
+
+- solo corre en produccion
+- llama `checkForUpdatesAndNotify()`
+- si descarga una actualizacion, ejecuta `quitAndInstall()`
+
+## Empaquetado
+
+Configuracion actual relevante:
+
+- Windows: `nsis`
+- macOS Intel: `dmg` `x64`
+
+Scripts relevantes:
 
 - `npm run dev`
 - `npm run build`
-- `npm run typecheck`
-- `npm run lint`
+- `npm run dist`
 - `npm run dist:win`
-- `npm run dist:win:publish`
+- `npm run dist:mac`
 
-### `npm run dist:win`
+## DevTools al arrancar
 
-Genera instalador Windows localmente sin publicar release.
+Antes, en desarrollo, la app abria automaticamente `openDevTools()`.
+Eso ya fue removido del arranque.
 
-Salida esperada:
+## Riesgos y observaciones tecnicas
 
-- `release/*.exe`
-- `release/win-unpacked/`
+- El login no muestra claramente una persistencia local completa de sesion entre reinicios
+- `Backups` sigue con dependencia Windows por `mysqldump.exe`
+- `Inventario` no es inventario fisico real; hoy es catalogo de servicios
+- `Auditoría` sigue sin desarrollar
+- Hay varios flujos acoplados a `window.location.reload()` despues de setup/licencia
+- La licencia depende de Supabase Function externa y cache local de gracia offline
 
-### `npm run dist:win:publish`
+## Mapa rapido de archivos clave
 
-Genera y publica release de Windows. Requiere además credenciales de publicación.
+Electron:
 
-## GitHub publish y `GH_TOKEN`
+- `src/main/main.ts`
+- `src/main/preload.ts`
+- `src/main/ipc/register.ts`
 
-Si se usa publicación automática con Electron Builder, se necesita:
+Servicios de sistema:
 
-- `GH_TOKEN`
+- `src/main/services/database-manager.ts`
+- `src/main/services/license-service.ts`
+- `src/main/services/backup-service.ts`
+- `src/main/services/printer-service.ts`
 
-Sin ese token, el empaquetado puede compilar pero fallará la fase de publicación.
+Backend:
 
-## Icono de la aplicación Windows
+- `src/backend/db/connection.ts`
+- `src/backend/db/migrator.ts`
+- `src/backend/db/migrations/*`
+- `src/backend/modules/*`
 
-La build está configurada para tomar el icono desde:
+Frontend:
 
-- `resources/icon.ico`
+- `src/renderer/App.tsx`
+- `src/renderer/services/api.ts`
+- `src/renderer/ui/layouts/AppShell.tsx`
+- `src/renderer/modules/*`
 
-Esa ruta sí se versiona y puede reemplazarse por el icono final del proyecto.
+Compartido:
 
-## Estructura de carpetas relevante
+- `src/shared/types.ts`
 
-```text
-src/
-  backend/
-    db/
-      schema.ts
-      migrations/
-    modules/
-      audit/
-      auth/
-      cash/
-      clients/
-      deliveries/
-      expenses/
-      invoices/
-      orders/
-      payments/
-      reports/
-      settings/
-      users/
-      warranties/
-  main/
-    ipc/
-    services/
-    main.ts
-    preload.ts
-  renderer/
-    modules/
-    services/
-    ui/
-    styles/
-  shared/
-    types.ts
-resources/
-  icon.ico
-```
+## Resumen ejecutivo
 
-## Estado actual
+Hoy la app ya cubre el flujo operativo principal de una lavanderia/sastreria:
 
-LavaSuite ya cubre el flujo principal de negocio y empaquetado Windows. El código del repositorio es suficiente para estudiar, extender y mantener la app, pero no incluye secretos, archivos privados ni credenciales de compilación protegida.
+- licencia
+- configuracion inicial
+- login
+- clientes
+- ordenes
+- pagos
+- facturacion
+- entregas
+- caja
+- gastos
+- garantias
+- reportes
+- mensajes por WhatsApp
+- configuracion
+- backups a Drive
+
+Lo faltante claramente visible es:
+
+- auditoria real
+- inventario fisico real
+- hardening cross-platform de backups
+- cualquier hardware fuera de Windows
