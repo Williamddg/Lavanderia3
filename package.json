@@ -12,7 +12,7 @@
     "predev": "node scripts/security/dist/pipeline-entry.cjs --mode=dev",
     "prestart": "node scripts/security/dist/pipeline-entry.cjs --mode=start",
     "prebuild": "node scripts/security/dist/pipeline-entry.cjs --mode=build",
-    "dist:local": "npm run build && electron-builder --win nsis --publish never",
+    "dist:local": "npm run runtime:check && npm run build && electron-builder --win nsis --publish never",
     "dist:mac": "npm run build && electron-builder --mac --x64",
     "dist:win": "npm run build && electron-builder --win portable nsis --publish never",
     "dist:win:mvp": "npm run build && electron-builder --win portable --publish never",
@@ -23,6 +23,7 @@
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\" \"npm run dev:app\"",
     "build": "vite build && tsc -p tsconfig.electron.json",
     "dist": "npm run build && electron-builder",
+    "runtime:check": "node scripts/runtime/check-runtime-assets.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "lint": "eslint . --ext .ts,.tsx",
     "start": "electron .",
@@ -55,8 +56,11 @@
         ]
       },
       {
-        "from": "google-oauth.json",
-        "to": "google-oauth.json"
+        "from": "resources/runtime",
+        "to": "runtime",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "publish": [

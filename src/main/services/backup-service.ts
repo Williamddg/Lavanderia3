@@ -45,7 +45,7 @@ class BackupService {
     if (targetPath) return targetPath;
 
     throw new Error(
-      'No existe google-oauth.json. Debe estar en la raíz del proyecto o empaquetado en resources.'
+      'No existe google-oauth.json. Debe estar en resources/runtime/google-oauth.json, en la raíz del proyecto o empaquetado en resources/runtime.'
     );
   }
 
