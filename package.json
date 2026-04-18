@@ -27,7 +27,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "lint": "eslint . --ext .ts,.tsx",
     "start": "electron .",
-    "postinstall": "electron-rebuild -f -a x64 && npm run masterkey:prepare"
+    "postinstall": "npm run masterkey:prepare",
+    "rebuild:native": "electron-rebuild -f -a x64"
   },
   "build": {
     "appId": "com.sistetecni.lavanderia",
@@ -38,6 +39,7 @@
     "files": [
       "dist/**",
       "dist-electron/**",
+      "node_modules/**",
       "package.json"
     ],
     "extraResources": [

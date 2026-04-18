@@ -4,7 +4,7 @@ import type { RuntimeCheck, RuntimeDiagnostics } from '../../shared/types.js';
 import {
   firstExistingPath,
   resolvePackagedResourcePath,
-  resolveProjectPath
+  resolveDevPath
 } from '../utils/runtime-paths.js';
 
 const resolvePrinterModulePath = () => {
@@ -18,9 +18,9 @@ const resolvePrinterModulePath = () => {
 const checkMysqldump = (): RuntimeCheck => {
   const resolvedPath = firstExistingPath([
     resolvePackagedResourcePath('bin', 'mysqldump.exe'),
-    resolveProjectPath('resources', 'bin', 'mysqldump.exe'),
+    resolveDevPath('resources', 'bin', 'mysqldump.exe'),
     resolvePackagedResourcePath('bin', 'mysqldump'),
-    resolveProjectPath('resources', 'bin', 'mysqldump')
+    resolveDevPath('resources', 'bin', 'mysqldump')
   ]);
 
   if (resolvedPath) {
@@ -46,8 +46,8 @@ const checkGoogleOauth = (): RuntimeCheck => {
   const resolvedPath = firstExistingPath([
     resolvePackagedResourcePath('runtime', 'google-oauth.json'),
     resolvePackagedResourcePath('google-oauth.json'),
-    resolveProjectPath('resources', 'runtime', 'google-oauth.json'),
-    resolveProjectPath('google-oauth.json')
+    resolveDevPath('resources', 'runtime', 'google-oauth.json'),
+    resolveDevPath('google-oauth.json')
   ]);
 
   if (!resolvedPath) {

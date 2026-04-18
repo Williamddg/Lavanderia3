@@ -123,11 +123,19 @@ app.whenReady().then(async () => {
     return
   }
 
-  await syncUserPreferences();
-    setInterval(() => {
-    syncUserPreferences().catch(e => console.error);
-  }, 24 * 60 * 60 * 1000);
+  /*
+  try {
+    await syncUserPreferences();
+  } catch (error) {
+    console.warn('[main] No se pudo ejecutar syncUserPreferences al arrancar:', error);
+  }
+    */
 
+  setInterval(() => {
+    syncUserPreferences().catch((error) => {
+      console.warn('[main] Error periódico en syncUserPreferences:', error);
+    });
+  }, 24 * 60 * 60 * 1000);
 
   registerIpc()
   await createWindow()
