@@ -65,7 +65,7 @@ class InitialSetupService {
 
   private getMigrationsDir() {
     const packagedPath = path.join(process.resourcesPath, 'sql', 'migrations');
-    const devPath = path.join(process.cwd(), 'src', 'backend', 'db', 'migrations');
+    const devPath = path.join(app.getAppPath(), 'src', 'backend', 'db', 'migrations');
 
     if (app.isPackaged && fs.existsSync(packagedPath)) {
       return packagedPath;
