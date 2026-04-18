@@ -29,6 +29,16 @@ export const SettingsPage = ({ user }: { user: SessionUser }) => {
     enabled: unlocked
   });
 
+  const {
+    data: runtimeDiagnostics,
+    refetch: refetchRuntimeDiagnostics,
+    isFetching: isRuntimeDiagnosticsLoading
+  } = useQuery({
+    queryKey: ['runtime-diagnostics'],
+    queryFn: api.runtimeDiagnostics,
+    enabled: unlocked
+  });
+
   const { data: pdfOutputDir } = useQuery({
     queryKey: ['pdf-output-dir'],
     queryFn: async () => {
@@ -357,6 +367,99 @@ export const SettingsPage = ({ user }: { user: SessionUser }) => {
         {pdfDirError && <p className="error-text">{pdfDirError}</p>}
         {updatePdfDirMutation.isSuccess && (
           <p style={{ margin: 0, color: 'green' }}>Carpeta PDF actualizada.</p>
+        )}
+      </div>
+
+      <div className="card-panel stack-gap">
+        <h3>Diagnóstico runtime (build autocontenida)</h3>
+        <p style={{ margin: 0, color: '#6b7280' }}>
+          Estado de dependencias críticas para instalación Windows.
+        </p>
+
+        <div className="form-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => refetchRuntimeDiagnostics()}
+            disabled={isRuntimeDiagnosticsLoading}
+          >
+            {isRuntimeDiagnosticsLoading ? 'Verificando...' : 'Revalidar diagnóstico'}
+          </Button>
+        </div>
+
+        {runtimeDiagnostics ? (
+          <>
+            <div style={{ display: 'grid', gap: 6, fontSize: 13, color: '#374151' }}>
+              <span><strong>Plataforma:</strong> {runtimeDiagnostics.platform}</span>
+              <span><strong>Empaquetada:</strong> {runtimeDiagnostics.isPackaged ? 'Sí' : 'No'}</span>
+              <span><strong>appPath:</strong> {runtimeDiagnostics.appPath}</span>
+              <span><strong>resourcesPath:</strong> {runtimeDiagnostics.resourcesPath}</span>
+            </div>
+
+            <DataTable
+              rows={runtimeDiagnostics.checks}
+              columns={[
+                {
+                  key: 'check',
+                  header: 'Chequeo',
+                  render: (row) => row.key
+                },
+                {
+                  key: 'status',
+                  header: 'Estado',
+                  render: (row) => {
+                    const color =
+                      row.status === 'ok'
+                        ? '#065f46'
+                        : row.status === 'warning'
+                          ? '#92400e'
+                          : '#991b1b';
+                    const background =
+                      row.status === 'ok'
+                        ? '#d1fae5'
+                        : row.status === 'warning'
+                          ? '#fef3c7'
+                          : '#fee2e2';
+
+                    return (
+                      <span
+                        style={{
+                          color,
+                          background,
+                          borderRadius: 999,
+                          padding: '2px 8px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          fontSize: 11
+                        }}
+                      >
+                        {row.status}
+                      </span>
+                    );
+                  }
+                },
+                {
+                  key: 'required',
+                  header: 'Requerido',
+                  render: (row) => (row.required ? 'Sí' : 'No')
+                },
+                {
+                  key: 'message',
+                  header: 'Mensaje',
+                  render: (row) => row.message
+                },
+                {
+                  key: 'path',
+                  header: 'Ruta detectada',
+                  render: (row) => row.resolvedPath || '—'
+                }
+              ]}
+            />
+          </>
+        ) : (
+          <p style={{ margin: 0, color: '#6b7280' }}>
+            Ejecuta “Revalidar diagnóstico” para obtener el estado actual.
+          </p>
         )}
       </div>
 
