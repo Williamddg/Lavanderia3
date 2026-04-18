@@ -8,20 +8,9 @@ Antes de empaquetar, coloca:
 
 - `resources/bin/mysqldump.exe` (obligatorio)
 - `resources/bin/LICENSE.mysqldump.txt` (recomendado por trazabilidad legal)
-- `resources/bin/mysqldump.source.json` (vendor/version/source_url/sha256)
 - `resources/runtime/google-oauth.json` (opcional, solo para backup Google Drive)
 
 > Si `mysqldump.exe` no existe, la build de Windows falla por diseño.
-
-### Procedencia recomendada de `mysqldump.exe` para este proyecto
-
-Recomendación operativa: usar `mysqldump.exe` de **MariaDB Community Server for Windows**, fijando versión en `mysqldump.source.json` y validando hash SHA-256 en `runtime:check`.
-
-Comparación práctica:
-- **MariaDB**: buena compatibilidad operativa, distribución simple para desktop.
-- **MySQL (Oracle)**: también válido técnicamente, pero en ambos casos (MySQL/MariaDB) debes validar licencia/compliance interno antes de redistribuir.
-
-Si legal no aprueba redistribución embebida, la alternativa menos riesgosa es **usar mysqldump del sistema** (PATH), pero eso rompe el objetivo de autocontenida.
 
 ## 2) Verificación previa de runtime
 
@@ -33,7 +22,6 @@ Resultado esperado:
 - `ERROR` si falta `mysqldump.exe`.
 - `WARNING` si falta `google-oauth.json`.
 - `WARNING`/`ERROR` si falta `@alexssmusica/node-printer` (crítico en Windows).
-- `ERROR` si el hash SHA-256 no coincide con `mysqldump.source.json`.
 
 ## 3) Build autocontenida recomendada
 
@@ -92,12 +80,9 @@ Start-Process ".\release\win-unpacked\Lavanderia y Sastreria Sistetecni.exe"
 # Verificar binarios críticos
 Test-Path ".\release\win-unpacked\resources\bin\mysqldump.exe"
 Test-Path ".\release\win-unpacked\resources\app.asar"
-
-# Smoke test completo (genera reporte JSON)
-powershell -ExecutionPolicy Bypass -File .\scripts\runtime\windows-smoke-test.ps1 -AppRoot release/win-unpacked
 ```
 
 Resultados esperados:
 - `True` para `mysqldump.exe`
 - `True` para `app.asar`
-- smoke test con tabla de resultados y `smoke-test-report.json`
+

@@ -86,9 +86,9 @@ Necesitas como mínimo:
 Para que la app empaquetada quede autosuficiente (sin instalar Node/npm en el equipo cliente), incluye estos recursos antes de correr `dist:win`:
 
 - `resources/bin/mysqldump.exe` (cliente de MySQL/MariaDB para backups SQL).
-- `resources/runtime/google-oauth.json` (o `google-oauth.json` en raíz, para compatibilidad) si se usarán backups en Google Drive.
+- `google-oauth.json` en la raíz del proyecto (si se usarán backups en Google Drive).
 
-La build copia `resources/bin` y `resources/runtime` dentro del paquete final.
+La build copia estos recursos a `resources/bin` y `resources/google-oauth.json` dentro del paquete final.
 
 ## Importante: archivos y credenciales privadas
 
@@ -132,7 +132,6 @@ Datos típicos de configuración inicial:
 - `npm run runtime:check`: valida binarios/credenciales runtime para build autocontenida.
 - `npm run dist:win:selfcontained`: genera portable + nsis y valida `win-unpacked`.
 - `npm run dist:win:selfcontained:mvp`: genera build portable mínima autocontenida.
-- `npm run runtime:smoke:windows`: smoke test de `win-unpacked` (ejecutar en PowerShell Windows).
 - `npm run typecheck`: validación TypeScript.
 - `npm run lint`: lint del proyecto.
 - `npm run dist:win`: genera instalador Windows localmente, sin publicar release. Requiere clave maestra.

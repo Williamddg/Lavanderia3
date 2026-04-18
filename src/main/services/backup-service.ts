@@ -9,7 +9,7 @@ import { google } from 'googleapis';
 import { databaseManager } from './database-manager.js';
 import {
   firstExistingPath,
-  resolveProjectPath,
+  resolveDevPath,
   resolvePackagedResourcePath
 } from '../utils/runtime-paths.js';
 
@@ -38,10 +38,8 @@ class BackupService {
 
   private getGoogleCredentialsPath() {
     const targetPath = firstExistingPath([
-      resolvePackagedResourcePath('runtime', 'google-oauth.json'),
       resolvePackagedResourcePath('google-oauth.json'),
-      resolveProjectPath('resources', 'runtime', 'google-oauth.json'),
-      resolveProjectPath('google-oauth.json')
+      resolveDevPath('google-oauth.json')
     ]);
 
     if (targetPath) return targetPath;
@@ -70,9 +68,9 @@ class BackupService {
   private async getMysqldumpPath() {
     const bundledPath = firstExistingPath([
       resolvePackagedResourcePath('bin', 'mysqldump.exe'),
-      resolveProjectPath('resources', 'bin', 'mysqldump.exe'),
+      resolveDevPath('resources', 'bin', 'mysqldump.exe'),
       resolvePackagedResourcePath('bin', 'mysqldump'),
-      resolveProjectPath('resources', 'bin', 'mysqldump')
+      resolveDevPath('resources', 'bin', 'mysqldump')
     ]);
 
     if (bundledPath) return bundledPath;
