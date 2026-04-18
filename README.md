@@ -81,6 +81,15 @@ Necesitas como mínimo:
 - npm
 - MySQL accesible desde la máquina local
 
+## Requisitos de runtime para build autocontenida en Windows
+
+Para que la app empaquetada quede autosuficiente (sin instalar Node/npm en el equipo cliente), incluye estos recursos antes de correr `dist:win`:
+
+- `resources/bin/mysqldump.exe` (cliente de MySQL/MariaDB para backups SQL).
+- `resources/runtime/google-oauth.json` (o `google-oauth.json` en raíz, para compatibilidad) si se usarán backups en Google Drive.
+
+La build copia `resources/bin` y `resources/runtime` dentro del paquete final.
+
 ## Importante: archivos y credenciales privadas
 
 Este repositorio no contiene todo lo necesario para compilar o distribuir la app de forma completa.
@@ -120,10 +129,15 @@ Datos típicos de configuración inicial:
 
 - `npm run dev`: desarrollo local.
 - `npm run build`: compila renderer y proceso principal. Requiere clave maestra.
+- `npm run runtime:check`: valida binarios/credenciales runtime para build autocontenida.
+- `npm run dist:win:selfcontained`: genera portable + nsis y valida `win-unpacked`.
+- `npm run dist:win:selfcontained:mvp`: genera build portable mínima autocontenida.
 - `npm run typecheck`: validación TypeScript.
 - `npm run lint`: lint del proyecto.
 - `npm run dist:win`: genera instalador Windows localmente, sin publicar release. Requiere clave maestra.
 - `npm run dist:win:publish`: genera y publica release de Windows. Requiere clave maestra y credenciales de publicación.
+
+Consulta `BUILD_WINDOWS_AUTOCONTENIDA.md` para el flujo operativo completo de empaquetado y validación en Windows limpio.
 
 ## Salida de compilación Windows
 

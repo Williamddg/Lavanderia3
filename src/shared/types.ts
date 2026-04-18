@@ -14,6 +14,24 @@ export type HealthStatus = {
   message: string;
 };
 
+export type RuntimeCheckStatus = 'ok' | 'warning' | 'error';
+
+export type RuntimeCheck = {
+  key: string;
+  status: RuntimeCheckStatus;
+  message: string;
+  resolvedPath: string | null;
+  required: boolean;
+};
+
+export type RuntimeDiagnostics = {
+  platform: NodeJS.Platform;
+  isPackaged: boolean;
+  appPath: string;
+  resourcesPath: string;
+  checks: RuntimeCheck[];
+};
+
 export type SetupRootConnectionInput = {
   host: string;
   port: number;
