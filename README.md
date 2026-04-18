@@ -86,9 +86,9 @@ Necesitas como mínimo:
 Para que la app empaquetada quede autosuficiente (sin instalar Node/npm en el equipo cliente), incluye estos recursos antes de correr `dist:win`:
 
 - `resources/bin/mysqldump.exe` (cliente de MySQL/MariaDB para backups SQL).
-- `resources/runtime/google-oauth.json` (o `google-oauth.json` en raíz, para compatibilidad) si se usarán backups en Google Drive.
+- `google-oauth.json` en la raíz del proyecto (si se usarán backups en Google Drive).
 
-La build copia `resources/bin` y `resources/runtime` dentro del paquete final.
+La build copia estos recursos a `resources/bin` y `resources/google-oauth.json` dentro del paquete final.
 
 ## Importante: archivos y credenciales privadas
 
