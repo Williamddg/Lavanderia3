@@ -14,21 +14,22 @@
     "prebuild": "node scripts/security/dist/pipeline-entry.cjs --mode=build",
     "dist:local": "npm run runtime:check && npm run build && electron-builder --win nsis --publish never",
     "dist:mac": "npm run build && electron-builder --mac --x64",
-    "dist:win": "npm run build && electron-builder --win portable nsis --publish never",
-    "dist:win:mvp": "npm run build && electron-builder --win portable --publish never",
-    "dist:win:publish": "npm run build && electron-builder --win nsis --publish always",
+    "dist:win": "npm run runtime:check && npm run build && electron-builder --win portable nsis --publish never",
+    "dist:win:mvp": "npm run runtime:check && npm run build && electron-builder --win portable --publish never",
+    "dist:win:publish": "npm run runtime:check && npm run build && electron-builder --win nsis --publish always",
     "dev:renderer": "vite",
     "dev:electron": "tsc -p tsconfig.electron.json --watch",
     "dev:app": "wait-on http-get://localhost:5173 dist-electron/main/main.js && npx electron .",
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\" \"npm run dev:app\"",
     "build": "vite build && tsc -p tsconfig.electron.json",
     "dist": "npm run build && electron-builder",
-    "runtime:check": "node scripts/runtime/check-runtime-assets.cjs",
+    "runtime:check": "node scripts/runtime/check-runtime-assets.cjs && node scripts/runtime/check-main-runtime-deps.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "lint": "eslint . --ext .ts,.tsx",
     "start": "electron .",
     "postinstall": "npm run masterkey:prepare",
-    "rebuild:native": "electron-rebuild -f -a x64"
+    "rebuild:native": "electron-rebuild -f -a x64",
+    "runtime:validate": "node scripts/runtime/validate-packaged-output.cjs"
   },
   "build": {
     "appId": "com.sistetecni.lavanderia",
@@ -39,7 +40,6 @@
     "files": [
       "dist/**",
       "dist-electron/**",
-      "node_modules/**",
       "package.json"
     ],
     "extraResources": [
@@ -102,7 +102,8 @@
       "createStartMenuShortcut": true,
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico"
-    }
+    },
+    "asar": true
   },
   "dependencies": {
     "@tanstack/react-query": "^5.76.1",

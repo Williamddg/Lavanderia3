@@ -5,7 +5,6 @@ import http from 'node:http';
 import { exec, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { shell } from 'electron';
-import { google } from 'googleapis';
 import { databaseManager } from './database-manager.js';
 import {
   firstExistingPath,
@@ -17,6 +16,26 @@ const execAsync = promisify(exec);
 
 const GOOGLE_REDIRECT_URI = 'http://127.0.0.1:3017/oauth2callback';
 const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+
+let googleApisModule: typeof import('googleapis') | null = null;
+
+const getGoogleApis = () => {
+  if (googleApisModule) {
+    return googleApisModule;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    googleApisModule = require('googleapis') as typeof import('googleapis');
+    return googleApisModule;
+  } catch (error) {
+    throw new Error(
+      `No fue posible cargar googleapis en runtime. Verifica que esté en dependencies y empaquetado. ${
+        error instanceof Error ? error.message : ''
+      }`.trim()
+    );
+  }
+};
 
 class BackupService {
   private async resolveCommand(command: string) {
@@ -57,6 +76,8 @@ class BackupService {
     if (!installed?.client_id || !installed?.client_secret) {
       throw new Error('El archivo google-oauth.json no es válido.');
     }
+
+    const { google } = getGoogleApis();
 
     return new google.auth.OAuth2(
       installed.client_id,
@@ -298,6 +319,7 @@ class BackupService {
   async uploadBackupToDrive(userId?: number) {
     const db = await databaseManager.getDb();
     const auth = await this.getAuthorizedClient(userId);
+    const { google } = getGoogleApis();
     const drive = google.drive({ version: 'v3', auth });
     const { fileName, filePath } = await this.createSqlBackup();
 

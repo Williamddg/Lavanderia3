@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import mysql from 'mysql2/promise';
+import type { Connection } from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 import { createDb } from '../../backend/db/connection.js';
+import { loadMysql2Promise } from '../../backend/db/mysql-runtime.js';
 import { databaseManager } from './database-manager.js';
 
 import type {
@@ -90,7 +91,7 @@ class InitialSetupService {
   }
 
   private async columnExists(
-    connection: mysql.Connection,
+    connection: Connection,
     databaseName: string,
     tableName: string,
     columnName: string
@@ -111,7 +112,7 @@ class InitialSetupService {
   }
 
   private async executeStatement(
-    connection: mysql.Connection,
+    connection: Connection,
     databaseName: string,
     statement: string
   ) {
@@ -158,6 +159,7 @@ class InitialSetupService {
 
   private async createRootConnection(input: SetupRootConnectionInput) {
     const root = this.normalizeRootConfig(input);
+    const mysql = loadMysql2Promise();
 
     return mysql.createConnection({
       host: root.host,
@@ -169,7 +171,7 @@ class InitialSetupService {
     });
   }
 
-  private async getPreferredCollation(connection: mysql.Connection) {
+  private async getPreferredCollation(connection: Connection) {
     const [rows] = await connection.query('SELECT VERSION() AS version');
     const version = Array.isArray(rows) ? String((rows[0] as any)?.version ?? '') : '';
 
@@ -180,6 +182,7 @@ class InitialSetupService {
 
   private async createDatabaseConnection(input: SetupRootConnectionInput) {
     const root = this.normalizeRootConfig(input);
+    const mysql = loadMysql2Promise();
 
     return mysql.createConnection({
       host: root.host,
