@@ -43,8 +43,17 @@ class PrinterService {
     this.ensureHardwareSupported();
 
     const printers = await this.listPrinters();
-    const printerModule = await import('@alexssmusica/node-printer');
-    const printer = printerModule.default;
+    let printer: any;
+    try {
+      const printerModule = await import('@alexssmusica/node-printer');
+      printer = printerModule.default;
+    } catch (error) {
+      throw new Error(
+        `No fue posible cargar el módulo nativo de impresión (@alexssmusica/node-printer). ${
+          error instanceof Error ? error.message : ''
+        }`.trim()
+      );
+    }
 
     const selected =
       printerName?.trim()
