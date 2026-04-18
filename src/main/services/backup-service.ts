@@ -7,6 +7,11 @@ import { promisify } from 'node:util';
 import { shell } from 'electron';
 import { google } from 'googleapis';
 import { databaseManager } from './database-manager.js';
+import {
+  firstExistingPath,
+  resolveProjectPath,
+  resolvePackagedResourcePath
+} from '../utils/runtime-paths.js';
 
 const execAsync = promisify(exec);
 
@@ -32,14 +37,17 @@ class BackupService {
   }
 
   private getGoogleCredentialsPath() {
-    const packagedPath = path.join(process.resourcesPath, 'google-oauth.json');
-    const devPath = path.join(process.cwd(), 'google-oauth.json');
+    const targetPath = firstExistingPath([
+      resolvePackagedResourcePath('runtime', 'google-oauth.json'),
+      resolvePackagedResourcePath('google-oauth.json'),
+      resolveProjectPath('resources', 'runtime', 'google-oauth.json'),
+      resolveProjectPath('google-oauth.json')
+    ]);
 
-    if (fs.existsSync(packagedPath)) return packagedPath;
-    if (fs.existsSync(devPath)) return devPath;
+    if (targetPath) return targetPath;
 
     throw new Error(
-      'No existe google-oauth.json. Debe estar en la raíz del proyecto o empaquetado en resources.'
+      'No existe google-oauth.json. Debe estar en resources/runtime/google-oauth.json, en la raíz del proyecto o empaquetado en resources/runtime.'
     );
   }
 
@@ -60,23 +68,14 @@ class BackupService {
   }
 
   private async getMysqldumpPath() {
-    const windowsPackagedPath = path.join(process.resourcesPath, 'bin', 'mysqldump.exe');
-    const windowsDevPath = path.join(process.cwd(), 'resources', 'bin', 'mysqldump.exe');
-    const unixPackagedPath = path.join(process.resourcesPath, 'bin', 'mysqldump');
-    const unixDevPath = path.join(process.cwd(), 'resources', 'bin', 'mysqldump');
+    const bundledPath = firstExistingPath([
+      resolvePackagedResourcePath('bin', 'mysqldump.exe'),
+      resolveProjectPath('resources', 'bin', 'mysqldump.exe'),
+      resolvePackagedResourcePath('bin', 'mysqldump'),
+      resolveProjectPath('resources', 'bin', 'mysqldump')
+    ]);
 
-    const candidates = [
-      windowsPackagedPath,
-      windowsDevPath,
-      unixPackagedPath,
-      unixDevPath
-    ];
-
-    for (const candidate of candidates) {
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
-    }
+    if (bundledPath) return bundledPath;
 
     const systemPath = await this.resolveCommand('mysqldump');
 

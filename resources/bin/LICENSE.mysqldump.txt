@@ -1,0 +1,6 @@
+REEMPLAZAR ESTE ARCHIVO CON LA LICENCIA REAL DEL BINARIO `mysqldump.exe` QUE VAS A REDISTRIBUIR.
+
+Sugerencia operativa:
+1) Descarga el binario desde la distribución oficial aprobada por tu equipo legal.
+2) Copia aquí el texto de licencia exacto de esa distribución.
+3) Mantén versión del binario + licencia sincronizadas.
