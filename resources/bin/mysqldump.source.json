@@ -1,0 +1,7 @@
+{
+  "vendor": "REPLACE_WITH_VENDOR",
+  "version": "REPLACE_WITH_VERSION",
+  "source_url": "REPLACE_WITH_DOWNLOAD_URL",
+  "sha256": "REPLACE_WITH_REAL_SHA256_HEX",
+  "notes": "Registrar procedencia exacta del binario redistribuido y validar compliance legal interna."
+}
