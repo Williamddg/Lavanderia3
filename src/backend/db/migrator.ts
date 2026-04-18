@@ -8,7 +8,8 @@ import type { Database } from './schema.js';
 const getMigrationsDir = () => {
   const packagedPath = path.join(process.resourcesPath, 'sql', 'migrations');
   const distPath = path.join(__dirname, 'migrations');
-  const devPath = path.join(process.cwd(), 'src', 'backend', 'db', 'migrations');
+  const appRootPath = app.getAppPath();
+  const devPath = path.join(appRootPath, 'src', 'backend', 'db', 'migrations');
 
   if (app.isPackaged && fs.existsSync(packagedPath)) {
     return packagedPath;

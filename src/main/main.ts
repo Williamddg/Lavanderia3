@@ -4,6 +4,7 @@ import { syncUserPreferences } from './services/telemetry';
 import * as crypto from 'node:crypto'
 import { registerIpc } from './ipc/register'
 import { autoUpdater } from 'electron-updater'
+import { resolveRuntimePath } from './utils/runtime-paths'
 import {
   MASTER_BUILD_AUTHORIZED,
   MASTER_BUILD_GENERATED_AT,
@@ -66,7 +67,7 @@ const createWindow = async () => {
     if (isDev) {
       await mainWindow.loadURL('http://localhost:5173')
     } else {
-      const indexPath = path.join(app.getAppPath(), 'dist', 'index.html')
+      const indexPath = resolveRuntimePath('dist', 'index.html')
       await mainWindow.loadFile(indexPath)
 
     }

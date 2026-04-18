@@ -81,6 +81,15 @@ Necesitas como mínimo:
 - npm
 - MySQL accesible desde la máquina local
 
+## Requisitos de runtime para build autocontenida en Windows
+
+Para que la app empaquetada quede autosuficiente (sin instalar Node/npm en el equipo cliente), incluye estos recursos antes de correr `dist:win`:
+
+- `resources/bin/mysqldump.exe` (cliente de MySQL/MariaDB para backups SQL).
+- `google-oauth.json` en la raíz del proyecto (si se usarán backups en Google Drive).
+
+La build copia estos recursos a `resources/bin` y `resources/google-oauth.json` dentro del paquete final.
+
 ## Importante: archivos y credenciales privadas
 
 Este repositorio no contiene todo lo necesario para compilar o distribuir la app de forma completa.
